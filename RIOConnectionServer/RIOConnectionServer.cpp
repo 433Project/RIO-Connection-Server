@@ -2,6 +2,7 @@
 //
 
 #include "stdafx.h"
+#include "RIOManager.h"
 
 //***Global Variables***
 RIO_EXTENSION_FUNCTION_TABLE g_RIO_UDP, g_RIO_TCPClient, g_RIO_TCPServer;
@@ -27,12 +28,7 @@ DWORD MAX_LISTEN_BACKLOG_CLIENT = 10000;
 DWORD MAX_LISTEN_BACKLOG_SERVER = 20;
 
 
-enum COMPLETION_KEY {
-	CK_QUIT,
-	CK_RIO,
-	CK_ACCEPT_CLIENT,
-	CK_ACCEPT_SERVER
-};
+
 
 inline void ReportError(
 	const char *pFunction, bool willExit);
@@ -174,7 +170,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 	// Setup Part 1: Create RIO Buffers
-	// To be made by Hokwen
+	// Buffer Manager Class
 
 	// Setup Part 2: Create IOCP Queue
 	g_hIOCP = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
