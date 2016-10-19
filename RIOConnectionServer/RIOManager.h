@@ -37,18 +37,22 @@ public:
 	~RIOManager();
 	int SetConfiguration(_TCHAR* config[]);		//Assigns configuration variables for the RIO_M instance
 	int InitializeRIO();						//Starts WinSock, Creates Buffer Manger and Registers Buffers
-	int CreateIOCP(HANDLE* hIOCP);				//Creates a new IOCP for the RIO_M instance
-	int CreateCQ(); //Figure out CQ identifier
+	HANDLE CreateIOCP();						//Creates a new IOCP for the RIO_M instance
+
+	//Overloaded Series of Functions to Create a New RIO Completion Queue
+	RIO_CQ CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey);	//IOCP Queue and Completion Key specified (For Multi-CQ systems)
+	RIO_CQ CreateCQ(HANDLE hIOCP);									//Create CQ with IOCP Queue specified (For creating main-CQ in Multi-IOCP system)
+	RIO_CQ CreateCQ();												//Default (For creating main-CQ for main-IOCP queue)
 
 	//Overloaded Series of Functions to Create a new RIO Socket of various types
-	int CreateRIOSocket(enum SocketType, RIO_CQ receiveCQ, RIO_CQ sendCQ);				//TCP Client or Server with CQs specified
-	int CreateRIOSocket(enum SocketType, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ);	//UDP Socket with CQs specified
-	int CreateRIOSocket(enum SocketType, int port, HANDLE hIOCP);						//TCP Listener with IOCP queue specified
-	int CreateRIOSocket(enum SocketType, int port);										//UDP Socket OR TCP Listener with default handles
-	int CreateRIOSocket(enum SocketType);												//Any Type with default values
+	int CreateRIOSocket(SocketType socketType, RIO_CQ receiveCQ, RIO_CQ sendCQ);			//TCP Client or Server with CQs specified
+	int CreateRIOSocket(SocketType socketType, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ);	//UDP Socket with CQs specified
+	int CreateRIOSocket(SocketType socketType, int port, HANDLE hIOCP);						//TCP Listener with IOCP queue specified
+	int CreateRIOSocket(SocketType socketType, int port);									//UDP Socket OR TCP Listener with default handles
+	int CreateRIOSocket(SocketType socketType);												//Any Type with default values
 
 	int GetCompletedResults(EXTENDED_RIO_BUF* results[]);
-	int ProcessInstruction(enum InstructionType);
+	int ProcessInstruction(InstructionType instructionType);
 	void Shutdown();
 private:
 	int CloseSocket();
