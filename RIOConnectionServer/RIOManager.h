@@ -26,8 +26,11 @@ enum COMPLETION_KEY {
 	CK_ACCEPT_SERVER
 };
 
-struct EXTENDED_RIO_BUF : public RIO_BUF {
+struct Received_Data {
 	OperationType operationType;
+	void* buffer;
+	int offset;
+	int length;
 };
 
 class RIOManager
@@ -58,7 +61,10 @@ public:
 	int CreateRIOSocket(SocketType socketType, int port);									//UDP Socket OR TCP Listener with default handles
 	int CreateRIOSocket(SocketType socketType);												//Any Type with default values
 
-	int GetCompletedResults(EXTENDED_RIO_BUF* results[]);
+	int GetCompletedResults(EXTENDED_RIO_BUF* results[]) {
+		results = new EXTENDED_RIO_BUF*[];
+		results[0] = new EXTENDED_RIO_BUF();
+	}
 	int ProcessInstruction(InstructionType instructionType);
 	void Shutdown();
 private:
