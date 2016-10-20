@@ -26,7 +26,7 @@ enum COMPLETION_KEY {
 	CK_ACCEPT_SERVER
 };
 
-struct Received_Data {
+struct ReceivedData {
 	OperationType operationType;
 	void* buffer;
 	int offset;

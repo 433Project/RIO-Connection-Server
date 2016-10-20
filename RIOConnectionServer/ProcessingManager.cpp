@@ -3,9 +3,9 @@
 #include "RIOManager.h"
 
 
-void ProcessingManager::StartProcessing(EXTENDED_RIO_BUF* buf)
+void ProcessingManager::StartProcessing(Received_Data* buf)
 {
-
+	buf->
 }
 
 ProcessingManager::ProcessingManager()
