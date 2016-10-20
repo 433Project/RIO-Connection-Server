@@ -32,6 +32,12 @@ struct EXTENDED_RIO_BUF : public RIO_BUF {
 
 class RIOManager
 {
+	RIO_EXTENSION_FUNCTION_TABLE rioFunctions;
+	SOCKET socketRIO;
+	GUID rioFunctionTableID = WSAID_MULTIPLE_RIO;
+	GUID acceptExID = WSAID_ACCEPTEX;
+	DWORD dwBytes = 0;
+
 public:
 	RIOManager();
 	~RIOManager();
@@ -40,7 +46,8 @@ public:
 	HANDLE CreateIOCP();						//Creates a new IOCP for the RIO_M instance
 
 	//Overloaded Series of Functions to Create a New RIO Completion Queue
-	RIO_CQ CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey);	//IOCP Queue and Completion Key specified (For Multi-CQ systems)
+	RIO_CQ CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey);	//IOCP Queue and Completion Key specified (For Multi-CQ system with Multi-IOCP)
+	RIO_CQ CreateCQ(COMPLETION_KEY completionKey);					//Create CQ with default IOCP Queue but custom Completion Key (For creating Multi-CQ system with one IOCP)
 	RIO_CQ CreateCQ(HANDLE hIOCP);									//Create CQ with IOCP Queue specified (For creating main-CQ in Multi-IOCP system)
 	RIO_CQ CreateCQ();												//Default (For creating main-CQ for main-IOCP queue)
 
@@ -56,5 +63,9 @@ public:
 	void Shutdown();
 private:
 	int CloseSocket();
+	int RegisterIOCP();
+	int RegisterRIOCQ();
+	int RegisterRIORQ();
+	HANDLE GetMainIOCP();
 };
 

@@ -5,12 +5,109 @@
 RIOManager::RIOManager()
 {
 
-	int InitializeRIO()
-	{
-
-		return 0;
-	}
 }
+
+int RIOManager::SetConfiguration(_TCHAR* config[]) {
+
+	return 0;
+}
+
+///This function
+int RIOManager::InitializeRIO()
+{
+	// 1. Initialize WinSock
+	WSADATA wsaData;
+
+	if (0 != ::WSAStartup(0x202, &wsaData)) {
+		return -1;
+		//ReportError("WSAStartup", true);
+	}
+
+	// 2. Load RIO Extension Functions
+	socketRIO = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
+	if (socketRIO == INVALID_SOCKET) {
+		return -2;
+		//ReportError("WSASocket - UDP Socket", true);
+	}
+
+	if (NULL != WSAIoctl(
+		socketRIO,
+		SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER,
+		&rioFunctionTableID,
+		sizeof(GUID),
+		(void**)&rioFunctions,
+		sizeof(rioFunctions),
+		&dwBytes,
+		NULL,
+		NULL))
+	{
+		return -3;
+		//ReportError("WSAIoctl - TCP Server - RIO", true);
+	}
+
+	// 3. **Initialize Buffer Manager**//
+
+	//**Initialize Buffer Manager**//
+
+	return 0;
+}
+
+///This function creates a new IOCP for the RIOManager instance and registers the IOCP with the RIOManager
+HANDLE RIOManager::CreateIOCP() {
+	HANDLE hIOCP = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
+	if (NULL == hIOCP) {
+		return NULL;
+		//ReportError("CreateIoComplectionPort - Create", true);
+	}
+
+	//**Register New IOCP with RIO Manager**//
+
+	//**Register New IOCP with RIO Manager**//
+
+	return hIOCP;
+}
+
+///This function creates a new RIO Completion Queue with IOCP Queue and Completion Key specified (For Multi-CQ systems with multi-IOCP)
+RIO_CQ RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
+	OVERLAPPED overlapped;
+	RIO_NOTIFICATION_COMPLETION rioNotificationCompletion;
+	RIO_CQ rioCompletionQueue;
+
+	rioNotificationCompletion.Type = RIO_IOCP_COMPLETION;
+	rioNotificationCompletion.Iocp.IocpHandle = hIOCP;
+	rioNotificationCompletion.Iocp.CompletionKey = (void*)completionKey;
+	rioNotificationCompletion.Iocp.Overlapped = &overlapped;
+
+	rioCompletionQueue = rioFunctions.RIOCreateCompletionQueue(
+		1000,	//MAX_PENDING_RECEIVES + MAX_PENDING_SENDS
+		&rioNotificationCompletion);
+	if (rioCompletionQueue == RIO_INVALID_CQ) {
+		return RIO_INVALID_CQ;
+		//ReportError("RIOCreateCompletionQueue", true);
+	}
+
+	//*** Need to Store this RIO_CQ handle into the RIO Manager Instance ***
+
+	return rioCompletionQueue;
+}
+
+///This function creates a new RIO Completion Queue with default IOCP Queue but custom Completion Key (For creating Multi-CQ system with one IOCP)
+RIO_CQ RIOManager::CreateCQ(COMPLETION_KEY completionKey) {
+	return CreateCQ(GetMainIOCP(), completionKey);
+}
+
+///This function creates a new RIO Completion Queue with IOCP Queue specified (For creating main-CQ in Multi-IOCP system)
+RIO_CQ RIOManager::CreateCQ(HANDLE hIOCP) {
+	return CreateCQ(hIOCP, CK_RIO);
+}
+
+///This function creates a new RIO Completion Queue with default values (For creating main-CQ for main-IOCP queue)
+RIO_CQ RIOManager::CreateCQ() {
+	return CreateCQ(GetMainIOCP());
+}
+
+///This function gets the main IOCP
+
 
 
 RIOManager::~RIOManager()
@@ -55,12 +152,7 @@ g_PortTCPServer = 11433;
 // B. Initialize Critical Section
 InitializeCriticalSectionAndSpinCount(&g_CriticalSection, g_SpinCount);
 
-// C. Initialize WinSock and Sockets
-WSADATA wsaData;
 
-if (0 != ::WSAStartup(0x202, &wsaData)) {
-ReportError("WSAStartup", true);
-}
 
 g_SocketTCPServer = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
 
@@ -102,9 +194,7 @@ ReportError("bind - UDP Socket", true);
 }
 
 // D. Get Extension Functions (RIO and AcceptEx)
-GUID rioFunctionTableID = WSAID_MULTIPLE_RIO;
-GUID acceptExID = WSAID_ACCEPTEX;
-DWORD dwBytes = 0;
+
 
 if (NULL != WSAIoctl(
 g_SocketTCPServer,
@@ -180,10 +270,7 @@ ReportError("WSAIoctl - TCP Client - AcceptEx", true);
 // Buffer Manager Class
 
 // Setup Part 2: Create IOCP Queue
-g_hIOCP = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
-if (NULL == g_hIOCP) {
-ReportError("CreateIoComplectionPort - Create", true);
-}
+
 g_hIOCP = ::CreateIoCompletionPort(
 (HANDLE)g_SocketTCPServer,
 g_hIOCP,
@@ -202,20 +289,7 @@ ReportError("CreateIoComplectionPort - TCP Client", true);
 }
 
 // Setup Part 3: Create RIO Completion Queue
-OVERLAPPED overlapped;
-RIO_NOTIFICATION_COMPLETION rioNotificationCompletion;
 
-rioNotificationCompletion.Type = RIO_IOCP_COMPLETION;
-rioNotificationCompletion.Iocp.IocpHandle = g_hIOCP;
-rioNotificationCompletion.Iocp.CompletionKey = (void*)CK_RIO;
-rioNotificationCompletion.Iocp.Overlapped = &overlapped;
-
-g_RIOCQ = g_RIO_TCPServer.RIOCreateCompletionQueue(
-MAX_PENDING_RECEIVES + MAX_PENDING_SENDS,
-&rioNotificationCompletion);
-if (g_RIOCQ == RIO_INVALID_CQ) {
-ReportError("RIOCreateCompletionQueue", true);
-}
 
 // Setup Part 4: Initialize UDP Socket
 g_RIORQ_UDP = g_RIO_UDP.RIOCreateRequestQueue(
