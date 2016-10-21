@@ -2,12 +2,12 @@
 
 struct ReceivedData;
 
-class ProcessingManager
+class SwitchManager
 {
 public:
 	void StartProcessing(ReceivedData* data);
 
-	ProcessingManager();
-	~ProcessingManager();
+	SwitchManager();
+	~SwitchManager();
 };
 

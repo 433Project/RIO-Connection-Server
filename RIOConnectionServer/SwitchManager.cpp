@@ -1,9 +1,9 @@
 #include "stdafx.h"
-#include "ProcessingManager.h"
+#include "SwitchManager.h"
 #include "RIOManager.h"
 
 
-void ProcessingManager::StartProcessing(ReceivedData* data)
+void SwitchManager::StartProcessing(ReceivedData* data)
 {
 	int length;
 	int src;
@@ -17,11 +17,11 @@ void ProcessingManager::StartProcessing(ReceivedData* data)
 
 
 
-ProcessingManager::ProcessingManager()
+SwitchManager::SwitchManager()
 {
 }
 
 
-ProcessingManager::~ProcessingManager()
+SwitchManager::~SwitchManager()
 {
 }

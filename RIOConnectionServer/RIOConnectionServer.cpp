@@ -3,7 +3,7 @@
 
 #include "stdafx.h"
 #include "RIOManager.h"
-
+#include "SwitchManager.h"
 
 inline void ReportError(
 	const char *pFunction, bool willExit);
@@ -18,9 +18,17 @@ int _tmain(int argc, _TCHAR* argv[])
 
 void MainProcess()
 {
+	RIOManager rioManager;
+	SwitchManager swichManager;
 	while (true)
 	{
-		GetQueuedCompletionStatus(RIOManager.GEt)
+		GetQueuedCompletionStatus();
+		std::vector<ReceivedData*> results;
+		rioManager.GetCompletedResults(results);
+		for each(auto result in results)
+		{
+			swichManager.StartProcessing(result);
+		}
 	}
 }
 
