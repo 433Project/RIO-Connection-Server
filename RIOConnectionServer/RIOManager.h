@@ -1,4 +1,7 @@
 #pragma once
+#include <unordered_map>
+
+using namespace std;
 
 enum SocketType {
 	UDPSocket,
@@ -38,6 +41,11 @@ struct CQ_Handler {
 	CRITICAL_SECTION criticalSection;
 };
 
+struct ConnectionServerService {
+	DWORD serviceName;
+	RIO_RQ rio_RQ;
+};
+
 class RIOManager
 {
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctions;
@@ -45,6 +53,9 @@ class RIOManager
 	GUID rioFunctionTableID = WSAID_MULTIPLE_RIO;
 	GUID acceptExID = WSAID_ACCEPTEX;
 	DWORD dwBytes = 0;
+
+	//Data Structures for Managing Servers/Clients
+	unordered_map<int, ConnectionServerService> serviceList;
 
 public:
 	RIOManager();
@@ -67,9 +78,9 @@ public:
 	int CreateRIOSocket(SocketType socketType, int port);													//UDP Socket OR TCP Listener with default handles
 	int CreateRIOSocket(SocketType socketType);																//Any Type with default values
 
-	int GetCompletedResults(ReceivedData** results) {
-		results = new ReceivedData*[];
-		results[0] = new ReceivedData();
+	int GetCompletedResults(vector<ReceivedData*>& results) {
+		//results = new ReceivedData*[];
+		//results[0] = new ReceivedData();
 	}
 	int ProcessInstruction(InstructionType instructionType);
 	void Shutdown();
