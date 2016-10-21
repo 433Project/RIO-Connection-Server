@@ -1,11 +1,11 @@
 #pragma once
 
-struct EXTENDED_RIO_BUF;
+struct ReceivedData;
 
 class ProcessingManager
 {
 public:
-	void StartProcessing(EXTENDED_RIO_BUF* buf);
+	void StartProcessing(ReceivedData* data);
 
 	ProcessingManager();
 	~ProcessingManager();

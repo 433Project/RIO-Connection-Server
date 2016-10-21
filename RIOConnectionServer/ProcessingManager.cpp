@@ -3,10 +3,19 @@
 #include "RIOManager.h"
 
 
-void ProcessingManager::StartProcessing(Received_Data* buf)
+void ProcessingManager::StartProcessing(ReceivedData* data)
 {
-	buf->
+	int length;
+	int src;
+	int dst;
+	memcpy(&length, data->buffer, 4);
+	memcpy(&src, data->buffer, 4);
+	memcpy(&dst, data->buffer, 4);
+
+
 }
+
+
 
 ProcessingManager::ProcessingManager()
 {

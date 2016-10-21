@@ -26,6 +26,12 @@ enum COMPLETION_KEY {
 	CK_ACCEPT_SERVER
 };
 
+enum SubjectType {
+	MATCHING_SERVER,
+
+
+};
+
 struct ReceivedData {
 	OperationType operationType;
 	void* buffer;
@@ -61,10 +67,7 @@ public:
 	int CreateRIOSocket(SocketType socketType, int port);									//UDP Socket OR TCP Listener with default handles
 	int CreateRIOSocket(SocketType socketType);												//Any Type with default values
 
-	int GetCompletedResults(EXTENDED_RIO_BUF* results[]) {
-		results = new EXTENDED_RIO_BUF*[];
-		results[0] = new EXTENDED_RIO_BUF();
-	}
+	int GetCompletedResults(ReceivedData* results[]);
 	int ProcessInstruction(InstructionType instructionType);
 	void Shutdown();
 private:
