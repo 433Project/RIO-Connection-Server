@@ -29,6 +29,12 @@ enum COMPLETION_KEY {
 	CK_ACCEPT_SERVER
 };
 
+enum SubjectType {
+	MATCHING_SERVER,
+
+
+};
+
 struct ReceivedData {
 	OperationType operationType;
 	void* buffer;

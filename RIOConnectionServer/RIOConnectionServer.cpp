@@ -16,6 +16,14 @@ int _tmain(int argc, _TCHAR* argv[])
     return 0;
 }
 
+void MainProcess()
+{
+	while (true)
+	{
+		GetQueuedCompletionStatus(RIOManager.GEt)
+	}
+}
+
 ///The ReportError function prints an error message and may shutdown the program if flagged to do so.
 inline void ReportError(
 	const char *pFunction, bool willExit)
