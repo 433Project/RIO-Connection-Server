@@ -33,6 +33,11 @@ struct ReceivedData {
 	int length;
 };
 
+struct CQ_Handler {
+	RIO_CQ rio_CQ;
+	CRITICAL_SECTION criticalSection;
+};
+
 class RIOManager
 {
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctions;
@@ -55,15 +60,16 @@ public:
 	RIO_CQ CreateCQ();												//Default (For creating main-CQ for main-IOCP queue)
 
 	//Overloaded Series of Functions to Create a new RIO Socket of various types
-	int CreateRIOSocket(SocketType socketType, RIO_CQ receiveCQ, RIO_CQ sendCQ);			//TCP Client or Server with CQs specified
-	int CreateRIOSocket(SocketType socketType, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ);	//UDP Socket with CQs specified
-	int CreateRIOSocket(SocketType socketType, int port, HANDLE hIOCP);						//TCP Listener with IOCP queue specified
-	int CreateRIOSocket(SocketType socketType, int port);									//UDP Socket OR TCP Listener with default handles
-	int CreateRIOSocket(SocketType socketType);												//Any Type with default values
+	int CreateRIOSocket(SocketType socketType, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ, HANDLE hIOCP);	//Any Type of Socket 
+	int CreateRIOSocket(SocketType socketType, RIO_CQ receiveCQ, RIO_CQ sendCQ);							//TCP Client or Server with CQs specified
+	int CreateRIOSocket(SocketType socketType, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ);					//UDP Socket with CQs specified
+	int CreateRIOSocket(SocketType socketType, int port, HANDLE hIOCP);										//TCP Listener with IOCP queue specified
+	int CreateRIOSocket(SocketType socketType, int port);													//UDP Socket OR TCP Listener with default handles
+	int CreateRIOSocket(SocketType socketType);																//Any Type with default values
 
-	int GetCompletedResults(EXTENDED_RIO_BUF* results[]) {
-		results = new EXTENDED_RIO_BUF*[];
-		results[0] = new EXTENDED_RIO_BUF();
+	int GetCompletedResults(ReceivedData** results) {
+		results = new ReceivedData*[];
+		results[0] = new ReceivedData();
 	}
 	int ProcessInstruction(InstructionType instructionType);
 	void Shutdown();
@@ -73,5 +79,6 @@ private:
 	int RegisterRIOCQ();
 	int RegisterRIORQ();
 	HANDLE GetMainIOCP();
+	RIO_CQ GetMainRIOCQ();
 };
 

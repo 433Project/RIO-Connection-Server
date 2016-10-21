@@ -72,6 +72,7 @@ RIO_CQ RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
 	OVERLAPPED overlapped;
 	RIO_NOTIFICATION_COMPLETION rioNotificationCompletion;
 	RIO_CQ rioCompletionQueue;
+	CRITICAL_SECTION criticalSection;
 
 	rioNotificationCompletion.Type = RIO_IOCP_COMPLETION;
 	rioNotificationCompletion.Iocp.IocpHandle = hIOCP;
@@ -85,6 +86,8 @@ RIO_CQ RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
 		return RIO_INVALID_CQ;
 		//ReportError("RIOCreateCompletionQueue", true);
 	}
+
+	InitializeCriticalSectionAndSpinCount(&criticalSection, 4000); //Add Spin Count Parameter here
 
 	//*** Need to Store this RIO_CQ handle into the RIO Manager Instance ***
 
@@ -105,6 +108,138 @@ RIO_CQ RIOManager::CreateCQ(HANDLE hIOCP) {
 RIO_CQ RIOManager::CreateCQ() {
 	return CreateCQ(GetMainIOCP());
 }
+
+///This function creates a new RIO Socket of various types
+int RIOManager::CreateRIOSocket(SocketType socketType, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ, HANDLE hIOCP) {
+	SOCKET newSocket;
+		sockaddr_in socketAddress;
+	socketAddress.sin_family = AF_INET;
+	socketAddress.sin_port = htons(port);
+	socketAddress.sin_addr.s_addr = INADDR_ANY;
+	IPPROTO ipProto;
+	DWORD controlCode;
+	bool isListener;
+	RIO_EXTENSION_FUNCTION_TABLE rioFunctions;
+	LPFN_ACCEPTEX acceptExFunction;
+	RIO_RQ rio_RQ;
+
+	switch (socketType) {
+	case UDPSocket:
+		ipProto = IPPROTO_UDP;
+		controlCode = SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER;
+		isListener = false;
+		break;
+	case TCPListener:
+		ipProto = IPPROTO_TCP;
+		controlCode = SIO_GET_EXTENSION_FUNCTION_POINTER;
+		isListener = true;
+		break;
+	case TCPClient:
+		ipProto = IPPROTO_TCP;
+		controlCode = SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER;
+		isListener = false;
+		break;
+	case TCPServer:
+		ipProto = IPPROTO_TCP;
+		controlCode = SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER;
+		isListener = false;
+		break;
+	default:
+		return -1; //Incorrect socket Type
+	}
+	
+	newSocket = WSASocket(AF_INET, SOCK_DGRAM, ipProto, NULL, 0, WSA_FLAG_REGISTERED_IO);
+
+	if (newSocket == INVALID_SOCKET) {
+		return -2;
+		//ReportError("WSASocket - TCP Server", true);
+	}
+
+	if (SOCKET_ERROR == ::bind(newSocket, reinterpret_cast<struct sockaddr *>(&socketAddress), sizeof(socketAddress))) {
+		return -3;
+		//ReportError("bind - TCP Server", true);
+	}
+
+	if (isListener) {
+		if (NULL != WSAIoctl(
+			newSocket,
+			SIO_GET_EXTENSION_FUNCTION_POINTER,
+			&acceptExID,
+			sizeof(GUID),
+			(void**)&acceptExFunction,
+			sizeof(acceptExFunction),
+			&dwBytes,
+			NULL,
+			NULL))
+		{
+			return -4;
+			//ReportError("WSAIoctl - TCP Server - AcceptEx", true);
+		}
+
+		if (SOCKET_ERROR == listen(newSocket, 100)) {	//MAX_LISTEN_BACKLOG_SERVER
+			return -5;
+			//ReportError("listen - TCP Server", true);
+		}
+
+		hIOCP = ::CreateIoCompletionPort(
+			(HANDLE)newSocket,
+			hIOCP,
+			(ULONG_PTR)CK_ACCEPT_SERVER,			//////////
+			4);								//MAX_CONCURRENT_THREADS
+		if (NULL == hIOCP) {
+			return -6;
+			//ReportError("CreateIoComplectionPort - TCP Server", true);
+		}
+	}
+	else {
+		if (NULL != WSAIoctl(
+			newSocket,
+			controlCode,
+			&rioFunctionTableID,
+			sizeof(GUID),
+			(void**)&rioFunctions,
+			sizeof(rioFunctions),
+			&dwBytes,
+			NULL,
+			NULL))
+		{
+			return -4;
+			//ReportError("WSAIoctl - UDP Socket", true);
+		}
+
+		rio_RQ = rioFunctions.RIOCreateRequestQueue(
+			newSocket, 1000, 1,		//MAX_PENDING_RECEIVES_UDP, MAX_PENDING_SENDS_UDP
+			1000, 1, receiveCQ,
+			sendCQ, NULL);			//Need to define socket context!!!
+		if (rio_RQ == RIO_INVALID_RQ) {
+			return -7;
+			//ReportError("RIOCreateRequestQueue - UDP Socket", true);
+		}
+	}
+
+	return 0;
+}
+
+int RIOManager::CreateRIOSocket(SocketType socketType, RIO_CQ receiveCQ, RIO_CQ sendCQ) {
+	return CreateRIOSocket(socketType, 0, receiveCQ, sendCQ, GetMainIOCP());
+}
+
+int RIOManager::CreateRIOSocket(SocketType socketType, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ) {
+	return CreateRIOSocket(socketType, port, receiveCQ, sendCQ, GetMainIOCP());
+}
+
+int RIOManager::CreateRIOSocket(SocketType socketType, int port, HANDLE hIOCP) {
+	return CreateRIOSocket(socketType, port, GetMainRIOCQ(), GetMainRIOCQ(), hIOCP);
+}
+
+int RIOManager::CreateRIOSocket(SocketType socketType, int port) {
+	return CreateRIOSocket(socketType, port, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP());
+}
+
+int RIOManager::CreateRIOSocket(SocketType socketType) {
+	return CreateRIOSocket(socketType, 0, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP());
+}
+
 
 ///This function gets the main IOCP
 
@@ -149,122 +284,7 @@ g_PortUDP = 9433;
 g_PortTCPClient = 10433;
 g_PortTCPServer = 11433;
 
-// B. Initialize Critical Section
-InitializeCriticalSectionAndSpinCount(&g_CriticalSection, g_SpinCount);
 
-
-
-g_SocketTCPServer = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
-
-if (g_SocketUDP == INVALID_SOCKET) {
-ReportError("WSASocket - TCP Server", true);
-}
-
-g_SocketTCPClient = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_REGISTERED_IO);
-
-if (g_SocketUDP == INVALID_SOCKET) {
-ReportError("WSASocket - TCP Client", true);
-}
-
-g_SocketUDP = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_REGISTERED_IO);
-
-if (g_SocketUDP == INVALID_SOCKET) {
-ReportError("WSASocket - UDP Socket", true);
-}
-
-sockaddr_in socketAddress;
-socketAddress.sin_family = AF_INET;
-socketAddress.sin_port = htons(g_PortTCPServer);
-socketAddress.sin_addr.s_addr = INADDR_ANY;
-
-if (SOCKET_ERROR == ::bind(g_SocketTCPServer, reinterpret_cast<struct sockaddr *>(&socketAddress), sizeof(socketAddress))) {
-ReportError("bind - TCP Server", true);
-}
-
-socketAddress.sin_port = htons(g_PortTCPClient);
-
-if (SOCKET_ERROR == ::bind(g_SocketTCPClient, reinterpret_cast<struct sockaddr *>(&socketAddress), sizeof(socketAddress))) {
-ReportError("bind - TCP Client", true);
-}
-
-socketAddress.sin_port = htons(g_PortUDP);
-
-if (SOCKET_ERROR == ::bind(g_SocketUDP, reinterpret_cast<struct sockaddr *>(&socketAddress), sizeof(socketAddress))) {
-ReportError("bind - UDP Socket", true);
-}
-
-// D. Get Extension Functions (RIO and AcceptEx)
-
-
-if (NULL != WSAIoctl(
-g_SocketTCPServer,
-SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER,
-&rioFunctionTableID,
-sizeof(GUID),
-(void**)&g_RIO_TCPServer,
-sizeof(g_RIO_TCPServer),
-&dwBytes,
-NULL,
-NULL))
-{
-ReportError("WSAIoctl - TCP Server - RIO", true);
-}
-
-if (NULL != WSAIoctl(
-g_SocketTCPClient,
-SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER,
-&rioFunctionTableID,
-sizeof(GUID),
-(void**)&g_RIO_TCPClient,
-sizeof(g_RIO_TCPClient),
-&dwBytes,
-NULL,
-NULL))
-{
-ReportError("WSAIoctl - TCP Client - RIO", true);
-}
-
-if (NULL != WSAIoctl(
-g_SocketUDP,
-SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER,
-&rioFunctionTableID,
-sizeof(GUID),
-(void**)&g_RIO_UDP,
-sizeof(g_RIO_UDP),
-&dwBytes,
-NULL,
-NULL))
-{
-ReportError("WSAIoctl - UDP Socket", true);
-}
-
-if (NULL != WSAIoctl(
-g_SocketTCPServer,
-SIO_GET_EXTENSION_FUNCTION_POINTER,
-&acceptExID,
-sizeof(GUID),
-(void**)&g_AcceptExServer,
-sizeof(g_AcceptExServer),
-&dwBytes,
-NULL,
-NULL))
-{
-ReportError("WSAIoctl - TCP Server - AcceptEx", true);
-}
-
-if (NULL != WSAIoctl(
-g_SocketTCPClient,
-SIO_GET_EXTENSION_FUNCTION_POINTER,
-&acceptExID,
-sizeof(GUID),
-(void**)&g_AcceptExClient,
-sizeof(g_AcceptExClient),
-&dwBytes,
-NULL,
-NULL))
-{
-ReportError("WSAIoctl - TCP Client - AcceptEx", true);
-}
 
 // Setup Part 1: Create RIO Buffers
 // Buffer Manager Class
@@ -288,25 +308,6 @@ if (NULL == g_hIOCP) {
 ReportError("CreateIoComplectionPort - TCP Client", true);
 }
 
-// Setup Part 3: Create RIO Completion Queue
-
-
-// Setup Part 4: Initialize UDP Socket
-g_RIORQ_UDP = g_RIO_UDP.RIOCreateRequestQueue(
-g_SocketUDP, MAX_PENDING_RECEIVES_UDP, 1,
-MAX_PENDING_SENDS_UDP, 1, g_RIOCQ,
-g_RIOCQ, NULL);
-if (g_RIORQ_UDP == RIO_INVALID_RQ) {
-ReportError("RIOCreateRequestQueue - UDP Socket", true);
-}
-
-// Setup Part 5 Start TCP Listening
-if (SOCKET_ERROR == listen(g_SocketTCPServer, MAX_LISTEN_BACKLOG_SERVER)) {
-ReportError("listen - TCP Server", true);
-}
-if (SOCKET_ERROR == listen(g_SocketTCPClient, MAX_LISTEN_BACKLOG_CLIENT)) {
-ReportError("listen - TCP Client", true);
-}
 
 //*********************************************************
 //**********************Initiation*************************
