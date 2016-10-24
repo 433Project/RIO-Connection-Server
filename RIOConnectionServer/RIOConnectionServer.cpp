@@ -11,7 +11,6 @@ void MainProcess(RIOManager& rioManager);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	
 	RIOManager rioManager;
 	std::vector<std::thread*> threadPool;
 
@@ -24,7 +23,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	for each(auto thread in threadPool)
 	{
 		thread->join();
+		delete thread;
 	}
+
+	threadPool.clear();
+	
 
     return 0;
 }
