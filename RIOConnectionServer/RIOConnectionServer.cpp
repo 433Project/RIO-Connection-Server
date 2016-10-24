@@ -14,6 +14,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	RIOManager rioManager;
 	std::vector<std::thread*> threadPool;
 
+
+
+
 	for (int i = 0; i < 8; i++)
 	{
 		std::thread* thread = new std::thread(MainProcess, rioManager);
