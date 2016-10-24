@@ -245,6 +245,27 @@ int RIOManager::CreateRIOSocket(SocketType socketType) {
 
 
 
+///This function creates a new service in the RIO Manager service list
+int RIOManager::CreateNewService(DWORD typeCode, string name, int portNumber) {
+	if (serviceList.find(typeCode) == serviceList.end()) {
+		return -1;
+	}
+	if (name.empty) {   /////////////
+		return -2;
+	}
+
+	ConnectionServerService service;
+
+	service.serviceName = name;
+	service.port = portNumber;
+	//service.socketList = new unordered_map<int, RIO_RQ>;
+
+	//serviceList.insert(typeCode, service);
+
+}
+
+
+
 RIOManager::~RIOManager()
 {
 }

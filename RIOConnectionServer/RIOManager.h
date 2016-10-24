@@ -42,8 +42,9 @@ struct CQ_Handler {
 };
 
 struct ConnectionServerService {
-	DWORD serviceName;
-	RIO_RQ rio_RQ;
+	string serviceName;
+	int port;
+	unordered_map<int, RIO_RQ> socketList;
 };
 
 class RIOManager
@@ -55,7 +56,7 @@ class RIOManager
 	DWORD dwBytes = 0;
 
 	//Data Structures for Managing Servers/Clients
-	unordered_map<int, ConnectionServerService> serviceList;
+	unordered_map<DWORD, ConnectionServerService> serviceList;	//Keeps track of all generated services
 
 public:
 	RIOManager();
@@ -85,6 +86,7 @@ public:
 	int ProcessInstruction(InstructionType instructionType);
 	void Shutdown();
 private:
+	int CreateNewService(DWORD typeCode, string name, int portNumber);
 	int CloseSocket();
 	int RegisterIOCP();
 	int RegisterRIOCQ();
