@@ -4,6 +4,8 @@
 #include "RIOManager.h"
 #include "SwitchManager.h"
 
+#define MIK_TEST_SPACE
+
 inline void ReportError(
 	const char *pFunction, bool willExit);
 
@@ -14,6 +16,20 @@ int _tmain(int argc, _TCHAR* argv[])
 	RIOManager rioManager;
 	std::vector<std::thread*> threadPool;
 
+#ifdef MIK_TEST_SPACE
+	//Testing IOCP Functions - START
+	HANDLE iocp;
+	iocp = rioManager.CreateIOCP();
+	iocp = rioManager.CreateIOCP();
+	iocp = rioManager.CreateIOCP();
+	iocp = rioManager.CreateIOCP();
+	iocp = rioManager.CreateIOCP();
+
+	rioManager.Shutdown();
+	std::cin.get();
+	return 1;
+	//Testing IOCP Functions - END
+#endif // MIK_TEST_SPACE
 
 
 
@@ -40,9 +56,9 @@ void MainProcess(RIOManager& rioManager)
 	SwitchManager swichManager;
 	while (true)
 	{
-		GetQueuedCompletionStatus();
+		//GetQueuedCompletionStatus();
 		std::vector<ReceivedData*> results;
-		rioManager.GetCompletedResults(results);
+		//rioManager.GetCompletedResults(results);
 		for each(auto result in results)
 		{
 			swichManager.StartProcessing(result);

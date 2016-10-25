@@ -1,5 +1,10 @@
 #pragma once
 #include <unordered_map>
+#include <deque>
+#include <iostream>
+#include <sstream>
+
+#define PRINT_MESSAGES
 
 using namespace std;
 
@@ -26,9 +31,7 @@ enum OperationType {
 enum COMPLETION_KEY {
 	CK_QUIT,
 	CK_RIO,
-	CK_ACCEPT,
-	CK_ACCEPT_CLIENT,
-	CK_ACCEPT_SERVER
+	CK_ACCEPT
 };
 
 enum SubjectType {
@@ -66,9 +69,14 @@ struct ConnectionServerService {
 
 typedef std::unordered_map<DWORD, ConnectionServerService> ServiceList;
 
+typedef deque<HANDLE> HandleList;
+
 class RIOManager
 {
-	RIO_EXTENSION_FUNCTION_TABLE rioFunctions;
+	RIO_EXTENSION_FUNCTION_TABLE rioFunctions; 
+	LPFN_ACCEPTEX acceptExFunction;
+	
+	HandleList iocpList;
 	SOCKET socketRIO;
 	GUID rioFunctionTableID = WSAID_MULTIPLE_RIO;
 	GUID acceptExID = WSAID_ACCEPTEX;
@@ -92,36 +100,36 @@ public:
 
 	//Overloaded Series of Functions to Create a new RIO Socket of various types
 	int CreateRIOSocket(SocketType socketType, DWORD serviceType, SOCKET newSocket, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ, HANDLE hIOCP);	//Any Type of Socket 
-	int CreateRIOSocket(SocketType socketType, DWORD serviceType, RIO_CQ receiveCQ, RIO_CQ sendCQ);							//TCP Client or Server with CQs specified
-	int CreateRIOSocket(SocketType socketType, DWORD serviceType, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ);				//UDP Socket with CQs specified
-	int CreateRIOSocket(SocketType socketType, int port, HANDLE hIOCP);														//TCP Listener with IOCP queue specified
-	int CreateRIOSocket(SocketType socketType, int port);																	//UDP Socket OR TCP Listener with default handles
-	int CreateRIOSocket(SocketType socketType, DWORD serviceType);																				//Any Type with default values
-	int CreateRIOSocket(SocketType socketType);																				//Any Type with default values
+	int CreateRIOSocket(SocketType socketType, DWORD serviceType, SOCKET newSocket, RIO_CQ receiveCQ, RIO_CQ sendCQ);							//TCP Client or Server with CQs specified
+	//int CreateRIOSocket(SocketType socketType, DWORD serviceType, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ);				//UDP Socket with CQs specified
+	//int CreateRIOSocket(SocketType socketType, int port, HANDLE hIOCP);														//TCP Listener with IOCP queue specified
+	//int CreateRIOSocket(SocketType socketType, int port);																	//UDP Socket OR TCP Listener with default handles
+	//int CreateRIOSocket(SocketType socketType, DWORD serviceType);																				//Any Type with default values
+	//int CreateRIOSocket(SocketType socketType);																				//Any Type with default values
 
 	int SetServiceCQs(DWORD typeCode, RIO_CQ receiveCQ, RIO_CQ sendCQ);
 
 
-	int GetCompletedResults(vector<ReceivedData*>& results) {
-		//results = new ReceivedData*[];
-		//results[0] = new ReceivedData();
-	}
-	int ProcessInstruction(InstructionType instructionType);
+	//int GetCompletedResults(vector<ReceivedData*>& results);
+	//int ProcessInstruction(InstructionType instructionType);
 
 	int NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped);
 
 	void Shutdown();
 private:
 	int CreateNewService(DWORD typeCode, int portNumber, SOCKET listeningSocket);
-	unordered_map<int, RIO_RQ>* GetService(DWORD typeCode);
+	//SocketList* GetService(DWORD typeCode);
 	int AddEntryToService(DWORD typeCode, int socketContext, RIO_RQ rioRQ);
 	SOCKET GetListeningSocket(DWORD typeCode);
-	int CloseSocket();
-	int RegisterIOCP();
+	/*int CloseSocket();
 	int RegisterRIOCQ();
-	int RegisterRIORQ();
+	int RegisterRIORQ();*/
 	int BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped);
 	HANDLE GetMainIOCP();
-	RIO_CQ GetMainRIOCQ();
+	//RIO_CQ GetMainRIOCQ();
+	void CloseIOCPHandles();
+	void PrintMessageFormatter(int level, string type, string subtype, string message);
+	void PrintMessageFormatter(int level, string type, string message);
+	void PrintBox(string word);
 };
 

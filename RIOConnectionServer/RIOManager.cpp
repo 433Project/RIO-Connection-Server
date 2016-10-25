@@ -60,9 +60,17 @@ HANDLE RIOManager::CreateIOCP() {
 		//ReportError("CreateIoComplectionPort - Create", true);
 	}
 
-	//**Register New IOCP with RIO Manager**//
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(0, "FUNCT START", "Creating IOCP Handle. . .");
+#endif // PRINT_MESSAGES
 
 	//**Register New IOCP with RIO Manager**//
+	iocpList.push_back(hIOCP);
+
+#ifdef PRINT_MESSAGES
+	int length = iocpList.size();
+	PrintMessageFormatter(1, "SUCCESS", "Created and Added IOCP #" + to_string(length));
+#endif // PRINT_MESSAGES
 
 	return hIOCP;
 }
@@ -238,8 +246,8 @@ int RIOManager::CreateRIOSocket(SocketType socketType, DWORD serviceType, SOCKET
 	return 0;
 }
 
-int RIOManager::CreateRIOSocket(SocketType socketType, DWORD serviceType, RIO_CQ receiveCQ, RIO_CQ sendCQ) {
-	return CreateRIOSocket(socketType, serviceType, NULL, 0, receiveCQ, sendCQ, INVALID_HANDLE_VALUE);
+int RIOManager::CreateRIOSocket(SocketType socketType, DWORD serviceType, SOCKET relevantSocket, RIO_CQ receiveCQ, RIO_CQ sendCQ) {
+	return CreateRIOSocket(socketType, serviceType, relevantSocket, 0, receiveCQ, sendCQ, INVALID_HANDLE_VALUE);
 }
 
 ///This function allows one to customize the receive/send CQ of a particular service.
@@ -295,6 +303,11 @@ int RIOManager::NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped) {
 	return 0;
 }
 
+///This function closes all resources associated with the RIOManager.
+void RIOManager::Shutdown() {
+	CloseIOCPHandles();
+}
+
 
 //////PRIVATE FUNCTIONS
 
@@ -312,9 +325,9 @@ int RIOManager::CreateNewService(DWORD typeCode, int portNumber, SOCKET listenin
 	ConnectionServerService service;
 	service.port = portNumber;
 	service.listeningSocket = listeningSocket;
-	RIO_CQ mainRIOCQ = GetMainRIOCQ();
-	service.receiveCQ = mainRIOCQ;
-	service.sendCQ = mainRIOCQ;
+	//RIO_CQ mainRIOCQ = GetMainRIOCQ();
+	//service.receiveCQ = mainRIOCQ;
+	//service.sendCQ = mainRIOCQ;
 	service.socketList = new SocketList();
 
 	serviceList.insert(std::pair<DWORD, ConnectionServerService>(typeCode, service));
@@ -332,26 +345,26 @@ int RIOManager::AddEntryToService(DWORD typeCode, int socketContext, RIO_RQ rioR
 		return -1;		//Service doesn't exist
 	}
 
-	//Get the service entry
-	ConnectionServerService service;
-	service = iter->second;
+//Get the service entry
+ConnectionServerService service;
+service = iter->second;
 
-	//Get a pointer to the service list in which we will add to
-	SocketList* socketList;
-	socketList = service.socketList;
+//Get a pointer to the service list in which we will add to
+SocketList* socketList;
+socketList = service.socketList;
 
-	if ((*socketList).find(socketContext) != (*socketList).end()) {
-		return -2;		//Particular socket entry already exists
-	}
+if ((*socketList).find(socketContext) != (*socketList).end()) {
+	return -2;		//Particular socket entry already exists
+}
 
-	if (rioRQ == NULL || rioRQ == RIO_INVALID_RQ) {
-		return -3;		//Invalid RIO_RQ
-	}
+if (rioRQ == NULL || rioRQ == RIO_INVALID_RQ) {
+	return -3;		//Invalid RIO_RQ
+}
 
-	//Add the socket context/ RQ pair into the service
-	(*socketList).insert(std::pair<int, RIO_RQ>(socketContext, rioRQ));
+//Add the socket context/ RQ pair into the service
+(*socketList).insert(std::pair<int, RIO_RQ>(socketContext, rioRQ));
 
-	return 0;
+return 0;
 }
 
 
@@ -379,7 +392,7 @@ int RIOManager::BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped) {
 	DWORD bytes;
 	char* buffer = NULL;
 
-	if (!(AcceptEx( 
+	if (!(acceptExFunction(			////////////
 		GetListeningSocket((*extendedOverlapped).identifier),
 		(*extendedOverlapped).relevantSocket,
 		buffer,
@@ -388,12 +401,95 @@ int RIOManager::BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped) {
 		sizeof(sockaddr_in) + 16,	//MSDN specifies that dwRemoteAddressLength "Cannot be zero."
 		&bytes,
 		extendedOverlapped
-		))) 
+	)))
 	{
 		return -1;
 	}
 
 	return 0;
+}
+
+///Gets the first IOCP handle in the list of IOCPs
+HANDLE RIOManager::GetMainIOCP() {
+	if (iocpList.empty()) {
+		return INVALID_HANDLE_VALUE;
+	}
+	return iocpList.front();
+}
+
+///This function goes through the list of IOCP handles and closes them all for proper cleanup
+void RIOManager::CloseIOCPHandles() {
+	HANDLE goodbyeIOCP;
+
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(0, "FUNCT START", "Closing all IOCP Handles. . .");
+	int i = 1;
+#endif // PRINT_MESSAGES
+
+	while (!iocpList.empty()) {
+		goodbyeIOCP = iocpList.front();
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "LOOP", "Closing IOCP Handle #" + to_string(i));
+		i++;
+#endif // PRINT_MESSAGES
+		CloseHandle(goodbyeIOCP);
+		iocpList.pop_front();
+	}
+}
+
+
+
+void RIOManager::PrintMessageFormatter(int level, string type, string subtype, string message) {
+	//Initial Spacing based on "level"
+	for (int i = 0; i < level; i++) {
+		printf_s("               ");
+	}
+
+	//Print Boxes
+	PrintBox(type);
+	PrintBox(subtype);
+
+	//Print Message
+	printf_s("%s\n", message.c_str());
+
+	return;
+}
+
+void RIOManager::PrintMessageFormatter(int level, string type, string message) {
+	//Initial Spacing based on "level"
+	for (int i = 0; i < level; i++) {
+		printf_s("               ");
+	}
+
+	//Print Boxes
+	PrintBox(type);
+
+	//Print Message
+	printf_s("%s\n", message.c_str());
+
+	return;
+}
+
+void RIOManager::PrintBox(string word) {
+	int length;
+	printf_s("[");
+
+	if (word.empty()) {
+		printf_s("STRING ERROR]\n");
+		return;
+	}
+
+	length = word.length();
+	if (length < 12) {
+		printf_s("%s", word.c_str());
+		for (int x = 0; x < (12 - length); x++) {
+			printf_s(" ");
+		}
+	}
+	else {
+		printf_s("%s", word.substr(0, 12).c_str());
+	}
+	printf_s("] ");
 }
 
 
