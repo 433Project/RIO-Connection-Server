@@ -17,17 +17,31 @@ int RIOManager::InitializeRIO()
 {
 	// 1. Initialize WinSock
 	WSADATA wsaData;
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(0, "RIO MANAGER", "InitializeRIO", "1. Initializing WinSock. . .");
+#endif // PRINT_MESSAGES
 
 	if (0 != ::WSAStartup(0x202, &wsaData)) {
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "ERROR", "WinSock Initialization Failed.");
+#endif // PRINT_MESSAGES
 		return -1;
-		//ReportError("WSAStartup", true);
 	}
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "SUCCESS", " ");
+#endif // PRINT_MESSAGES
 
 	// 2. Load RIO Extension Functions
-	socketRIO = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "InitializeRIO", "2. Loading RIO Extension Functions. . .");
+#endif // PRINT_MESSAGES
+	socketRIO = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
 	if (socketRIO == INVALID_SOCKET) {
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "ERROR", "WSASocket failed to generate socket.");
+		PrintWindowsErrorMessage();
+#endif // PRINT_MESSAGES
 		return -2;
-		//ReportError("WSASocket - UDP Socket", true);
 	}
 
 	if (NULL != WSAIoctl(
@@ -41,18 +55,31 @@ int RIOManager::InitializeRIO()
 		NULL,
 		NULL))
 	{
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to retrieve RIO extension functions.");
+#endif // PRINT_MESSAGES
 		return -3;
-		//ReportError("WSAIoctl - TCP Server - RIO", true);
 	}
 
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "SUCCESS", " ");
+#endif // PRINT_MESSAGES
+
 	// 3. **Initialize Buffer Manager**//
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "InitializeRIO", "3. . . .");
+#endif // PRINT_MESSAGES
 
 	//**Initialize Buffer Manager**//
 
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "COMPLETE", " ");
+#endif // PRINT_MESSAGES
 	return 0;
 }
 
-///This function creates a new IOCP for the RIOManager instance and registers the IOCP with the RIOManager
+///This function creates a new IOCP queue for the RIOManager instance and registers the IOCP queue with the RIOManager.
+///The first IOCP queue that is registered is registered as the "main" or "default" IOCP queue.
 HANDLE RIOManager::CreateIOCP() {
 	HANDLE hIOCP = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
 	if (NULL == hIOCP) {
@@ -61,7 +88,7 @@ HANDLE RIOManager::CreateIOCP() {
 	}
 
 #ifdef PRINT_MESSAGES
-	PrintMessageFormatter(0, "FUNCT START", "Creating IOCP Handle. . .");
+	PrintMessageFormatter(0, "RIO MANAGER", "CreateIOCP", "Creating IOCP Handle. . .");
 #endif // PRINT_MESSAGES
 
 	//**Register New IOCP with RIO Manager**//
@@ -117,11 +144,12 @@ CQ_Handler RIOManager::CreateCQ() {
 }
 
 ///This function creates a new RIO Socket of various types
-int RIOManager::CreateRIOSocket(SocketType socketType, DWORD serviceType, SOCKET newSocket, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ, HANDLE hIOCP) {
+int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ, HANDLE hIOCP) {
 	sockaddr_in socketAddress;
 	socketAddress.sin_family = AF_INET;
 	socketAddress.sin_port = htons(port);
 	socketAddress.sin_addr.s_addr = INADDR_ANY;
+	int type;
 	IPPROTO ipProto;
 	DWORD controlCode;
 	bool isListener, requiresBind;
@@ -132,18 +160,20 @@ int RIOManager::CreateRIOSocket(SocketType socketType, DWORD serviceType, SOCKET
 	switch (socketType) {
 		//Non-accepted Socket Cases
 	case UDPSocket:
+		type = SOCK_DGRAM;
 		ipProto = IPPROTO_UDP;
 		controlCode = SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER;
 		isListener = false;
 		requiresBind = true;
-		newSocket = WSASocket(AF_INET, SOCK_DGRAM, ipProto, NULL, 0, WSA_FLAG_REGISTERED_IO);
+		newSocket = WSASocket(AF_INET, type, ipProto, NULL, 0, WSA_FLAG_REGISTERED_IO);
 		break;
 	case TCPListener:
+		type = SOCK_STREAM;
 		ipProto = IPPROTO_TCP;
 		controlCode = SIO_GET_EXTENSION_FUNCTION_POINTER;
 		isListener = true;
 		requiresBind = true;
-		newSocket = WSASocket(AF_INET, SOCK_DGRAM, ipProto, NULL, 0, WSA_FLAG_REGISTERED_IO);
+		newSocket = WSASocket(AF_INET, type, ipProto, NULL, 0, WSA_FLAG_REGISTERED_IO);
 		break;
 		//Accepted Socket Cases
 	case TCPConnection:
@@ -246,7 +276,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, DWORD serviceType, SOCKET
 	return 0;
 }
 
-int RIOManager::CreateRIOSocket(SocketType socketType, DWORD serviceType, SOCKET relevantSocket, RIO_CQ receiveCQ, RIO_CQ sendCQ) {
+int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET relevantSocket, RIO_CQ receiveCQ, RIO_CQ sendCQ) {
 	return CreateRIOSocket(socketType, serviceType, relevantSocket, 0, receiveCQ, sendCQ, INVALID_HANDLE_VALUE);
 }
 
@@ -317,7 +347,7 @@ void RIOManager::Shutdown() {
 
 ///This function creates a new service in the RIO Manager service list.
 ///Note that the receive and send CQs are set to the default value.
-int RIOManager::CreateNewService(DWORD typeCode, int portNumber, SOCKET listeningSocket) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket) {
 	if (serviceList.find(typeCode) != serviceList.end()) {
 		return -1;		//Service already exists
 	}
@@ -338,7 +368,7 @@ int RIOManager::CreateNewService(DWORD typeCode, int portNumber, SOCKET listenin
 
 
 
-int RIOManager::AddEntryToService(DWORD typeCode, int socketContext, RIO_RQ rioRQ) {
+int RIOManager::AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ) {
 	//Find the service entry
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
@@ -368,7 +398,7 @@ return 0;
 }
 
 
-SOCKET RIOManager::GetListeningSocket(DWORD typeCode) {
+SOCKET RIOManager::GetListeningSocket(int typeCode) {
 	//Find the service entry
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
@@ -422,7 +452,7 @@ void RIOManager::CloseIOCPHandles() {
 	HANDLE goodbyeIOCP;
 
 #ifdef PRINT_MESSAGES
-	PrintMessageFormatter(0, "FUNCT START", "Closing all IOCP Handles. . .");
+	PrintMessageFormatter(0, "RIO MANAGER", "CloseIOCPHandles", "Closing all IOCP Handles. . .");
 	int i = 1;
 #endif // PRINT_MESSAGES
 
@@ -438,7 +468,7 @@ void RIOManager::CloseIOCPHandles() {
 }
 
 
-
+///This function prints a message to console with a specified format (two boxes).
 void RIOManager::PrintMessageFormatter(int level, string type, string subtype, string message) {
 	//Initial Spacing based on "level"
 	for (int i = 0; i < level; i++) {
@@ -455,6 +485,7 @@ void RIOManager::PrintMessageFormatter(int level, string type, string subtype, s
 	return;
 }
 
+///This function prints a message to console with a specified format (one box).
 void RIOManager::PrintMessageFormatter(int level, string type, string message) {
 	//Initial Spacing based on "level"
 	for (int i = 0; i < level; i++) {
@@ -470,6 +501,7 @@ void RIOManager::PrintMessageFormatter(int level, string type, string message) {
 	return;
 }
 
+///This function prints a box with a word inside.
 void RIOManager::PrintBox(string word) {
 	int length;
 	printf_s("[");
@@ -490,6 +522,16 @@ void RIOManager::PrintBox(string word) {
 		printf_s("%s", word.substr(0, 12).c_str());
 	}
 	printf_s("] ");
+}
+
+///This function gets the last windows error and prints it using our message formatter.
+void RIOManager::PrintWindowsErrorMessage() {
+	wchar_t buf[256];
+	FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(),
+		MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), buf, 256, NULL);
+	wstring ws(buf);
+	PrintMessageFormatter(1, "MESSAGE", string(ws.begin(), ws.end()));
+	return;
 }
 
 

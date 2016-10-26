@@ -17,18 +17,13 @@ int _tmain(int argc, _TCHAR* argv[])
 	std::vector<std::thread*> threadPool;
 
 #ifdef MIK_TEST_SPACE
-	//Testing IOCP Functions - START
+	rioManager.InitializeRIO();
 	HANDLE iocp;
-	iocp = rioManager.CreateIOCP();
-	iocp = rioManager.CreateIOCP();
-	iocp = rioManager.CreateIOCP();
-	iocp = rioManager.CreateIOCP();
 	iocp = rioManager.CreateIOCP();
 
 	rioManager.Shutdown();
 	std::cin.get();
 	return 1;
-	//Testing IOCP Functions - END
 #endif // MIK_TEST_SPACE
 
 
