@@ -34,14 +34,19 @@ enum COMPLETION_KEY {
 	CK_ACCEPT
 };
 
-enum SubjectType {
-	MATCHING_SERVER,
-
-
+enum DestinationType
+{
+	MATCHING_SERVER = 0,
+	MATCHING_CLIENT,
+	ROOM_MANAGER,
+	PACKET_GENERATOR,
+	MONITORING_SERVER
 };
 
 struct ReceivedData {
 	OperationType operationType;
+	int connectionId;
+	DestinationType srcType;
 	void* buffer;
 	int offset;
 	int length;

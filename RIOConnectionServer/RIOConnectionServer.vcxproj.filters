@@ -27,7 +27,7 @@
     <ClInclude Include="RIOManager.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="SwitchManager.h">
+    <ClInclude Include="ProcessManager.h">
       <Filter>소스 파일</Filter>
     </ClInclude>
   </ItemGroup>
@@ -41,7 +41,7 @@
     <ClCompile Include="RIOManager.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="SwitchManager.cpp">
+    <ClCompile Include="ProcessManager.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
