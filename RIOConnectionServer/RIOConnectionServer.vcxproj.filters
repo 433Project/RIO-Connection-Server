@@ -24,10 +24,10 @@
     <ClInclude Include="targetver.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="RIOManager.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="ProcessManager.h">
+      <Filter>소스 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="RIOManager.h">
       <Filter>소스 파일</Filter>
     </ClInclude>
   </ItemGroup>

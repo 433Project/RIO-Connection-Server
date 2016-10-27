@@ -13,7 +13,7 @@ struct AddressInfo
 class ProcessManager
 {
 public:
-	void StartProcessing(ReceivedData* data);
+	Instruction GetInstructions(ReceivedData* data);
 
 	ProcessManager();
 	~ProcessManager();

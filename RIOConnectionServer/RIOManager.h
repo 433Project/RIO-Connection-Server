@@ -43,15 +43,6 @@ enum DestinationType
 	MONITORING_SERVER
 };
 
-struct ReceivedData {
-	OperationType operationType;
-	int connectionId;
-	DestinationType srcType;
-	void* buffer;
-	int offset;
-	int length;
-};
-
 struct EXTENDED_OVERLAPPED : OVERLAPPED {
 	DWORD identifier;
 	SOCKET relevantSocket;
@@ -62,11 +53,21 @@ struct CQ_Handler {
 	CRITICAL_SECTION criticalSection;
 };
 
+struct EXTENDED_RIO_BUF : public RIO_BUF
+{
+	OperationType operationType;
+	DestinationType srcType;
+	int socketContext;
+	void* buffer;
+	int messageLength;
+
+};
+
 struct Instruction {
 	InstructionType type;
 	int socketContext;		//Destination Code
-	int destinationType;
-	char* buffer;
+	DestinationType destinationType;
+	EXTENDED_RIO_BUF* buffer;
 	int length;
 };
 

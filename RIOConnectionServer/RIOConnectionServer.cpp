@@ -57,7 +57,7 @@ void MainProcess(RIOManager& rioManager)
 		for each(auto result in results)
 		{
 			
-			swichManager.StartProcessing(result);
+			swichManager.GetInstructions(result);
 		}
 	}
 }
