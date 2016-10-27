@@ -2,7 +2,7 @@
 #include "stdafx.h"
 #include <thread>
 #include "RIOManager.h"
-#include "SwitchManager.h"
+#include "ProcessManager.h"
 
 #define MIK_TEST_SPACE
 
@@ -49,7 +49,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 void MainProcess(RIOManager& rioManager)
 {
-	SwitchManager swichManager;
+	ProcessManager swichManager;
 	while (true)
 	{
 		//GetQueuedCompletionStatus();
@@ -57,7 +57,8 @@ void MainProcess(RIOManager& rioManager)
 		//rioManager.GetCompletedResults(results);
 		for each(auto result in results)
 		{
-			swichManager.StartProcessing(result);
+			
+			swichManager.GetInstructions(result);
 		}
 	}
 }

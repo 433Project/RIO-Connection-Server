@@ -145,13 +145,13 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="SwitchManager.h" />
+    <ClInclude Include="ProcessManager.h" />
     <ClInclude Include="RIOManager.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="SwitchManager.cpp" />
+    <ClCompile Include="ProcessManager.cpp" />
     <ClCompile Include="RIOConnectionServer.cpp" />
     <ClCompile Include="RIOManager.cpp" />
     <ClCompile Include="stdafx.cpp">

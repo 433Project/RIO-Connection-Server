@@ -34,17 +34,13 @@ enum COMPLETION_KEY {
 	CK_ACCEPT =2
 };
 
-enum SubjectType {
-	MATCHING_SERVER,
-
-
-};
-
-struct ReceivedData {
-	OperationType operationType;
-	void* buffer;
-	int offset;
-	int length;
+enum DestinationType
+{
+	MATCHING_SERVER = 0,
+	MATCHING_CLIENT,
+	ROOM_MANAGER,
+	PACKET_GENERATOR,
+	MONITORING_SERVER
 };
 
 struct EXTENDED_OVERLAPPED : OVERLAPPED {
@@ -57,11 +53,21 @@ struct CQ_Handler {
 	CRITICAL_SECTION criticalSection;
 };
 
+struct EXTENDED_RIO_BUF : public RIO_BUF
+{
+	OperationType operationType;
+	DestinationType srcType;
+	int socketContext;
+	void* buffer;
+	int messageLength;
+
+};
+
 struct Instruction {
 	InstructionType type;
 	int socketContext;		//Destination Code
-	int destinationType;
-	char* buffer;
+	DestinationType destinationType;
+	EXTENDED_RIO_BUF* buffer;
 	int length;
 };
 
