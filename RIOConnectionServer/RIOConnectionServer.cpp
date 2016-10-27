@@ -20,6 +20,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	rioManager.InitializeRIO();
 	HANDLE iocp;
 	iocp = rioManager.CreateIOCP();
+	CQ_Handler rio_CQ = rioManager.CreateCQ();
 
 	rioManager.Shutdown();
 	std::cin.get();

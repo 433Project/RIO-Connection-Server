@@ -7,7 +7,6 @@
 
 #define PRINT_MESSAGES
 
-
 typedef std::unordered_map<int, RIO_RQ> SocketList;
 
 struct ConnectionServerService {
@@ -21,6 +20,8 @@ typedef std::unordered_map<DWORD, ConnectionServerService> ServiceList;
 
 typedef deque<HANDLE> HandleList;
 
+typedef deque<CQ_Handler> CQList;
+
 class RIOManager
 {
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctions; 
@@ -28,6 +29,7 @@ class RIOManager
 	
 	HandleList iocpList;
 	SOCKET socketRIO;
+	CQList rioCQList;
 	GUID rioFunctionTableID = WSAID_MULTIPLE_RIO;
 	GUID acceptExID = WSAID_ACCEPTEX;
 	DWORD dwBytes = 0;
@@ -57,7 +59,7 @@ public:
 	//int CreateRIOSocket(SocketType socketType, DWORD serviceType);																				//Any Type with default values
 	//int CreateRIOSocket(SocketType socketType);																				//Any Type with default values
 
-	int SetServiceCQs(DWORD typeCode, RIO_CQ receiveCQ, RIO_CQ sendCQ);
+	int SetServiceCQs(int typeCode, RIO_CQ receiveCQ, RIO_CQ sendCQ);
 
 
 	//int GetCompletedResults(vector<ReceivedData*>& results);
@@ -78,6 +80,7 @@ private:
 	HANDLE GetMainIOCP();
 	//RIO_CQ GetMainRIOCQ();
 	void CloseIOCPHandles();
+	void CloseCQs();
 	void PrintMessageFormatter(int level, string type, string subtype, string message);
 	void PrintMessageFormatter(int level, string type, string message);
 	void PrintWindowsErrorMessage();
