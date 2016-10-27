@@ -3,30 +3,32 @@
 #include "RIOManager.h"
 
 
-Instruction ProcessManager::GetInstructions(ReceivedData* data)
+Instruction ProcessManager::GetInstructions(EXTENDED_RIO_BUF* data)
 {
 	AddressInfo receivedInfo;
 	
-	memcpy(&receivedInfo.srcType, (byte*)data->buffer + data->offset + 4, 4);
-	memcpy(&receivedInfo.srcCode, (byte*)data->buffer + data->offset + 8, 4);
+	memcpy(&receivedInfo.srcType, (byte*)data->buffer + data->Offset + 4, 4);
+	memcpy(&receivedInfo.srcCode, (byte*)data->buffer + data->Offset + 8, 4);
 
-	memcpy(&receivedInfo.dstType, (byte*)data->buffer + data->offset + 12, 4);
-	memcpy(&receivedInfo.dstCode, (byte*)data->buffer + data->offset + 16, 4);
+	memcpy(&receivedInfo.dstType, (byte*)data->buffer + data->Offset + 12, 4);
+	memcpy(&receivedInfo.dstCode, (byte*)data->buffer + data->Offset + 16, 4);
 
 	AddressInfo changedInfo = GetManagedInfo(receivedInfo, *data);
 
-	memcpy((byte*)data->buffer + data->offset + 4, &receivedInfo.srcType, 4);
-	memcpy((byte*)data->buffer + data->offset + 8, &receivedInfo.srcCode, 4);
+	memcpy((byte*)data->buffer + data->Offset + 4, &receivedInfo.srcType, 4);
+	memcpy((byte*)data->buffer + data->Offset + 8, &receivedInfo.srcCode, 4);
 
-	memcpy((byte*)data->buffer + data->offset + 12, &receivedInfo.dstType, 4);
-	memcpy((byte*)data->buffer + data->offset + 16, &receivedInfo.dstCode, 4);
+	memcpy((byte*)data->buffer + data->Offset + 12, &receivedInfo.dstType, 4);
+	memcpy((byte*)data->buffer + data->Offset + 16, &receivedInfo.dstCode, 4);
 
 	Instruction instruction;
-	instruction.buffer = data->buffer;
+	instruction.buffer = data;
 	instruction.destinationType = changedInfo.dstType;
-	instruction.length = data->length;
+	instruction.length = data->messageLength;
 	instruction.socketContext = data->socketContext;
 	instruction.type = SEND;
+
+	return instruction;
 }
 
 
@@ -40,7 +42,7 @@ ProcessManager::~ProcessManager()
 {
 }
 
-AddressInfo ProcessManager::GetManagedInfo(AddressInfo receivedInfo, const ReceivedData& data)
+AddressInfo ProcessManager::GetManagedInfo(AddressInfo receivedInfo, const EXTENDED_RIO_BUF& data)
 {
 	AddressInfo result;
 	if(matchingServerCount > 3)

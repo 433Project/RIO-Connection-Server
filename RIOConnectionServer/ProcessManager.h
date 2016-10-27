@@ -1,6 +1,7 @@
 #pragma once
+#include "definitions.h"
 
-struct ReceivedData;
+struct EXTENDED_RIO_BUF;
 
 struct AddressInfo
 {
@@ -13,14 +14,14 @@ struct AddressInfo
 class ProcessManager
 {
 public:
-	Instruction GetInstructions(ReceivedData* data);
+	Instruction GetInstructions(EXTENDED_RIO_BUF* data);
 
 	ProcessManager();
 	~ProcessManager();
 
 private:
 
-	AddressInfo GetManagedInfo(AddressInfo receivedInfo, const ReceivedData& data);
+	AddressInfo GetManagedInfo(AddressInfo receivedInfo, const EXTENDED_RIO_BUF& data);
 
 private:
 	int matchingServerCount;

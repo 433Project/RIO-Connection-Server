@@ -52,7 +52,7 @@ void MainProcess(RIOManager& rioManager)
 	while (true)
 	{
 		//GetQueuedCompletionStatus();
-		std::vector<ReceivedData*> results;
+		std::vector<EXTENDED_RIO_BUF*> results;
 		//rioManager.GetCompletedResults(results);
 		for each(auto result in results)
 		{
