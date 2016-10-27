@@ -21,6 +21,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	HANDLE iocp;
 	iocp = rioManager.CreateIOCP();
 	CQ_Handler rio_CQ = rioManager.CreateCQ();
+	rioManager.CreateRIOSocket(UDPSocket, 1, 9433);
 
 	rioManager.Shutdown();
 	std::cin.get();
