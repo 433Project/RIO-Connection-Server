@@ -108,6 +108,10 @@ CQ_Handler RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
 	OVERLAPPED overlapped;
 	RIO_NOTIFICATION_COMPLETION rioNotificationCompletion;
 
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(0, "RIO MANAGER", "CreateCQ", "Creating RIO Completion Queue. . .");
+#endif // PRINT_MESSAGES
+
 	rioNotificationCompletion.Type = RIO_IOCP_COMPLETION;
 	rioNotificationCompletion.Iocp.IocpHandle = hIOCP;
 	rioNotificationCompletion.Iocp.CompletionKey = (void*)completionKey;
@@ -117,13 +121,21 @@ CQ_Handler RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
 		1000,	//MAX_PENDING_RECEIVES + MAX_PENDING_SENDS
 		&rioNotificationCompletion);
 	if (cqHandler.rio_CQ == RIO_INVALID_CQ) {
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "ERROR", "CreateCQ failed to create an RIO Completion Queue.");
+#endif // PRINT_MESSAGES
 		return cqHandler;
-		//ReportError("RIOCreateCompletionQueue", true);
 	}
 
 	InitializeCriticalSectionAndSpinCount(&cqHandler.criticalSection, 4000); //Add Spin Count Parameter here
 
-	//*** Need to Store this RIO_CQ handle into the RIO Manager Instance ***
+	//*** Need to Store this RIO_CQ handle/Critical Section into the RIO Manager Instance ***
+	rioCQList.push_back(cqHandler);
+
+#ifdef PRINT_MESSAGES
+	int length = rioCQList.size();
+	PrintMessageFormatter(1, "SUCCESS", "Created and Added RIO CQ #" + to_string(length));
+#endif // PRINT_MESSAGES
 
 	return cqHandler;
 }
@@ -281,7 +293,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET r
 }
 
 ///This function allows one to customize the receive/send CQ of a particular service.
-int RIOManager::SetServiceCQs(DWORD typeCode, RIO_CQ receiveCQ, RIO_CQ sendCQ) {
+int RIOManager::SetServiceCQs(int typeCode, RIO_CQ receiveCQ, RIO_CQ sendCQ) {
 	//Find the service entry
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
@@ -335,7 +347,15 @@ int RIOManager::NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped) {
 
 ///This function closes all resources associated with the RIOManager.
 void RIOManager::Shutdown() {
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(0, "RIO MANAGER", "SHUTDOWN", "Initializing shutdown sequence. . .");
+#endif // PRINT_MESSAGES
+	CloseCQs();
 	CloseIOCPHandles();
+
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "COMPLETE", " ");
+#endif // PRINT_MESSAGES
 }
 
 
@@ -452,7 +472,7 @@ void RIOManager::CloseIOCPHandles() {
 	HANDLE goodbyeIOCP;
 
 #ifdef PRINT_MESSAGES
-	PrintMessageFormatter(0, "RIO MANAGER", "CloseIOCPHandles", "Closing all IOCP Handles. . .");
+	PrintMessageFormatter(1, "CloseIOCPHandles", "Closing all IOCP Handles. . .");
 	int i = 1;
 #endif // PRINT_MESSAGES
 
@@ -465,8 +485,34 @@ void RIOManager::CloseIOCPHandles() {
 		CloseHandle(goodbyeIOCP);
 		iocpList.pop_front();
 	}
+
+	return;
 }
 
+///This function 
+void RIOManager::CloseCQs() {
+	CQ_Handler goodbyeRIOCQ;
+
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "CloseCQs", "Closing all RIO CQs and critical sections. . .");
+	int i = 1;
+#endif // PRINT_MESSAGES
+
+	while (!rioCQList.empty()) {
+		goodbyeRIOCQ = rioCQList.front();
+		rioCQList.pop_front();
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "LOOP", "Closing RIO_CQ #" + to_string(i));
+#endif // PRINT_MESSAGES
+		rioFunctions.RIOCloseCompletionQueue(goodbyeRIOCQ.rio_CQ);
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "LOOP", "Closing Critical Section #" + to_string(i));
+		i++;
+#endif // PRINT_MESSAGES
+		DeleteCriticalSection(&goodbyeRIOCQ.criticalSection);
+	}
+	return;
+}
 
 ///This function prints a message to console with a specified format (two boxes).
 void RIOManager::PrintMessageFormatter(int level, string type, string subtype, string message) {
