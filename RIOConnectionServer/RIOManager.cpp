@@ -67,10 +67,11 @@ int RIOManager::InitializeRIO()
 
 	// 3. **Initialize Buffer Manager**//
 #ifdef PRINT_MESSAGES
-	PrintMessageFormatter(1, "InitializeRIO", "3. . . .");
+	PrintMessageFormatter(1, "InitializeRIO", "3. Initializing Buffer Mananger. . .");
 #endif // PRINT_MESSAGES
 
 	//**Initialize Buffer Manager**//
+	bufferManager.Initialize(rioFunctions, 100, 1024);
 
 #ifdef PRINT_MESSAGES
 	PrintMessageFormatter(1, "COMPLETE", " ");
@@ -579,6 +580,7 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningS
 ///Note that the receive and send CQs are set to the default value.
 int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket) {
 	CRITICAL_SECTION emptyCriticalSection;
+	InitializeCriticalSectionAndSpinCount(&emptyCriticalSection, 4000);
 	return CreateNewService(typeCode, portNumber, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection);
 }
 

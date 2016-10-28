@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include "definitions.h"
+#include "BufferManager.h"
 
 #define PRINT_MESSAGES
 
@@ -28,6 +29,7 @@ class RIOManager
 {
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctions; 
 	LPFN_ACCEPTEX acceptExFunction;
+	BufferManager bufferManager;
 	
 	HandleList iocpList;		//Keep track of all IOCP queues for cleanup
 	SOCKET socketRIO;			//A dedicated socket in order to load extension functions
