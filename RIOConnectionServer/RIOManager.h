@@ -14,6 +14,8 @@ struct ConnectionServerService {
 	SOCKET listeningSocket;
 	CQ_Handler receiveCQ;
 	CQ_Handler sendCQ;
+	RIO_RQ udpRQ;
+	CRITICAL_SECTION udpCriticalSection;
 	SocketList* socketList;
 };
 typedef std::unordered_map<DWORD, ConnectionServerService> ServiceList;
@@ -62,21 +64,26 @@ public:
 
 	int SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sendCQ);
 
-
-	//int GetCompletedResults(vector<ReceivedData*>& results);
+	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler);
+	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults);
 	//int ProcessInstruction(InstructionType instructionType);
 
 	int NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped);
 
+	//TEMPS
+	RIO_BUFFERID RegBuf(char* buffer, DWORD length);
+	void DeRegBuf(RIO_BUFFERID riobuf);
+	void PostRecv(int serviceType, RIO_BUF* buf);
+	int RIONotifyIOCP(RIO_CQ  rioCQ);
+	//
+
 	void Shutdown();
 private:
+	int CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection);
 	int CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket);
 	//SocketList* GetService(DWORD typeCode);
-	int AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ, SOCKET socket);
+	int AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ, SOCKET socket, CRITICAL_SECTION criticalSection);
 	SOCKET GetListeningSocket(int typeCode);
-	/*int CloseSocket();
-	int RegisterRIOCQ();
-	int RegisterRIORQ();*/
 	int BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped);
 	HANDLE GetMainIOCP();
 	CQ_Handler GetMainRIOCQ();

@@ -242,7 +242,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		}
 	}
 
-	if (isListener) {
+	if (isListener) {			//******Listeners******
 #ifdef PRINT_MESSAGES
 		PrintMessageFormatter(2, "WSAIoctl", "Loading AcceptEx function Pointer. . .");
 #endif // PRINT_MESSAGES
@@ -304,7 +304,8 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 			return -8;
 		}
 	}
-	else {		//Non-Listeners
+
+	else {		//********Non-Listeners******
 #ifdef PRINT_MESSAGES
 		PrintMessageFormatter(2, "WSAIoctl", "Loading RIO extension function table. . .");
 #endif // PRINT_MESSAGES
@@ -325,6 +326,10 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 #endif // PRINT_MESSAGES
 			return -4;
 		}
+
+		//Create Critical Section
+		CRITICAL_SECTION criticalSection;
+		InitializeCriticalSectionAndSpinCount(&criticalSection, 4000); //Add Spin Count Parameter here
 
 		int socketContext = (int)newSocket;
 
@@ -349,7 +354,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 #ifdef PRINT_MESSAGES
 			PrintMessageFormatter(2, "CreateNewService", "Registering the UDP service #" + to_string(serviceType));
 #endif // PRINT_MESSAGES
-			if (CreateNewService(serviceType, port, newSocket) < 0) {
+			if (CreateNewService(serviceType, port, newSocket, rio_RQ, criticalSection) < 0) {
 #ifdef PRINT_MESSAGES
 				PrintMessageFormatter(1, "ERROR", "Could not register new service.");
 #endif // PRINT_MESSAGES
@@ -360,7 +365,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 #ifdef PRINT_MESSAGES
 			PrintMessageFormatter(2, "AddEntryToService", "Adding the new connection to TCP service #" + to_string(serviceType));
 #endif // PRINT_MESSAGES
-			if (AddEntryToService(serviceType, socketContext, rio_RQ, newSocket) < 0) {
+			if (AddEntryToService(serviceType, socketContext, rio_RQ, newSocket, criticalSection) < 0) {
 #ifdef PRINT_MESSAGES
 				PrintMessageFormatter(1, "ERROR", "Could add entry to service.");
 #endif // PRINT_MESSAGES
@@ -405,6 +410,68 @@ int RIOManager::SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sen
 	return 0;
 }
 
+
+///This function gets the RIO results from a particular RIO CQ.
+int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler) {
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(0, "RIO MANAGER", "GetCompletedResults", "Dequeuing results from a RIO_CQ. . .");
+#endif // PRINT_MESSAGES
+	
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "Enter Critical", "Entering the CQ's critical section.");
+#endif // PRINT_MESSAGES
+	//Enter critical section of the CQ we are trying to access
+	EnterCriticalSection(&(cqHandler.criticalSection));
+
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "RIODequeueCompletion", "Pulling results from the CQ.");
+#endif // PRINT_MESSAGES
+	int numResults = rioFunctions.RIODequeueCompletion(cqHandler.rio_CQ, rioResults, 1000); ////Maximum array size
+
+	//Leave the critical section asap so another thread can access asap
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "Leave Critical", "Leaving the CQ's critical section.");
+#endif // PRINT_MESSAGES
+	LeaveCriticalSection(&(cqHandler.criticalSection));
+
+	if (numResults == RIO_CORRUPT_CQ) {
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "ERROR", "RIO_CORRUPT_CQ upon RIODequeueCompletion.");
+		PrintWindowsErrorMessage();
+#endif // PRINT_MESSAGES
+		return -1;
+	}
+	else if (numResults == 0) {
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "ERROR", "No RIORESULTs found during RIODequeueCompletion.");
+#endif // PRINT_MESSAGES
+		return numResults;
+	}
+
+	EXTENDED_RIO_BUF* tempRIOBuf;
+
+	results.clear();
+
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "Results->Bufs", "Determining EXTENDED_RIO_BUF structures from RIORESULTS.");
+#endif // PRINT_MESSAGES
+	for (int i = 0; i < numResults; i++)
+	{
+		tempRIOBuf = reinterpret_cast<EXTENDED_RIO_BUF*>(rioResults[i].RequestContext);
+		results.push_back(tempRIOBuf);
+	}
+
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "COMPLETE", " ");
+#endif // PRINT_MESSAGES
+
+	return numResults;
+}
+
+int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults) {
+	return GetCompletedResults(results, rioResults, GetMainRIOCQ());
+}
+
 ///This function processes an AcceptEx completion by creating a new RIOSocket with the appropriate settings.
 int RIOManager::NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped) {
 	CQ_Handler serviceCQs[2];
@@ -440,6 +507,29 @@ int RIOManager::NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped) {
 	return 0;
 }
 
+
+
+RIO_BUFFERID RIOManager::RegBuf(char* buffer, DWORD length) {
+	return rioFunctions.RIORegisterBuffer(buffer, length);
+}
+
+void RIOManager::DeRegBuf(RIO_BUFFERID riobuf) {
+	rioFunctions.RIODeregisterBuffer(riobuf);
+	return;
+}
+
+
+void RIOManager::PostRecv(int serviceType, RIO_BUF* buf) {
+	ServiceList::iterator iter = serviceList.find(serviceType);
+	ConnectionServerService connServ = iter->second;
+	bool x = rioFunctions.RIOReceive(connServ.udpRQ, buf, 1, 0, 0);
+}
+
+int RIOManager::RIONotifyIOCP(RIO_CQ rioCQ) {
+	return rioFunctions.RIONotify(rioCQ);
+}
+
+
 ///This function closes all resources associated with the RIOManager.
 void RIOManager::Shutdown() {
 #ifdef PRINT_MESSAGES
@@ -464,7 +554,7 @@ void RIOManager::Shutdown() {
 
 ///This function creates a new service in the RIO Manager service list.
 ///Note that the receive and send CQs are set to the default value.
-int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection) {
 	if (serviceList.find(typeCode) != serviceList.end()) {
 		return -1;		//Service already exists
 	}
@@ -476,6 +566,8 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningS
 	service.receiveCQ = mainRIOCQ;
 	service.sendCQ = mainRIOCQ;
 	service.socketList = new SocketList();
+	service.udpRQ = udpRQ;
+	service.udpCriticalSection = udpCriticalSection;
 
 	serviceList.insert(std::pair<DWORD, ConnectionServerService>(typeCode, service));
 
@@ -483,9 +575,16 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningS
 
 }
 
+///This function creates a new service in the RIO Manager service list.
+///Note that the receive and send CQs are set to the default value.
+int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket) {
+	CRITICAL_SECTION emptyCriticalSection;
+	return CreateNewService(typeCode, portNumber, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection);
+}
 
 
-int RIOManager::AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ, SOCKET socket) {
+
+int RIOManager::AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ, SOCKET socket, CRITICAL_SECTION criticalSection) {
 	//Find the service entry
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
@@ -512,6 +611,7 @@ if (rioRQ == NULL || rioRQ == RIO_INVALID_RQ) {
 RQ_Handler rqHandler;
 rqHandler.rio_RQ = rioRQ;
 rqHandler.socket = socket;
+rqHandler.criticalSection = criticalSection;
 (*socketList).insert(std::pair<int, RQ_Handler>(socketContext, rqHandler));
 
 return 0;

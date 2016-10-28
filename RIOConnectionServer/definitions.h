@@ -53,6 +53,7 @@ struct CQ_Handler {
 struct RQ_Handler {
 	RIO_RQ rio_RQ;
 	SOCKET socket;
+	CRITICAL_SECTION criticalSection;
 };
 
 
