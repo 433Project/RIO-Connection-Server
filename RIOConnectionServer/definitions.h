@@ -52,7 +52,7 @@ struct EXTENDED_RIO_BUF : public RIO_BUF
 	OperationType operationType;
 	DestinationType srcType;
 	int socketContext;
-	void* buffer;
+	char* buffer;
 	int messageLength;
 
 };
