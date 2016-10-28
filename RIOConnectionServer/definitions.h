@@ -42,8 +42,17 @@ struct EXTENDED_OVERLAPPED : OVERLAPPED {
 };
 
 struct CQ_Handler {
+	CQ_Handler() {
+		rio_CQ = RIO_INVALID_CQ;
+	}
+
 	RIO_CQ rio_CQ;
 	CRITICAL_SECTION criticalSection;
+};
+
+struct RQ_Handler {
+	RIO_RQ rio_RQ;
+	SOCKET socket;
 };
 
 
