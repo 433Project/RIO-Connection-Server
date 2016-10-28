@@ -17,7 +17,7 @@ BufferManager::~BufferManager()
 
 	for each(auto pair in rioBuffers)
 	{
-		delete pair.second;
+		VirtualFree(pair.second, 0, MEM_RELEASE);
 	}
 
 	rioBuffers.clear();
