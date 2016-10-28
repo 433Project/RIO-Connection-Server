@@ -34,7 +34,6 @@ void BufferManager::Initialize(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable, D
 	this->bufferSize = bufferSize;
 	this->maxBufferCount = totalBufferCount;
 
-	rioBuffers.emplace_back(newMemoryArea);
 	RIO_BUFFERID id = rioFuntionsTable.RIORegisterBuffer(newMemoryArea, totalBufferSize);
 
 	rioBuffers.emplace_back(id, newMemoryArea);
