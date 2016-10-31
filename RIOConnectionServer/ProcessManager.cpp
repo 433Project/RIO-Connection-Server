@@ -15,11 +15,11 @@ Instruction ProcessManager::GetInstructions(EXTENDED_RIO_BUF* data)
 
 	AddressInfo changedInfo = GetManagedInfo(receivedInfo, *data);
 
-	memcpy((byte*)data->buffer + data->Offset + 4, &receivedInfo.srcType, 4);
-	memcpy((byte*)data->buffer + data->Offset + 8, &receivedInfo.srcCode, 4);
+	memcpy((byte*)data->buffer + data->Offset + 4, &changedInfo.srcType, 4);
+	memcpy((byte*)data->buffer + data->Offset + 8, &changedInfo.srcCode, 4);
 
-	memcpy((byte*)data->buffer + data->Offset + 12, &receivedInfo.dstType, 4);
-	memcpy((byte*)data->buffer + data->Offset + 16, &receivedInfo.dstCode, 4);
+	memcpy((byte*)data->buffer + data->Offset + 12, &changedInfo.dstType, 4);
+	memcpy((byte*)data->buffer + data->Offset + 16, &changedInfo.dstCode, 4);
 
 	Instruction instruction;
 	instruction.buffer = data;
