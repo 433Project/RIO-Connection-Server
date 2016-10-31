@@ -75,7 +75,7 @@ public:
 	//TEMPS
 	RIO_BUFFERID RegBuf(char* buffer, DWORD length);
 	void DeRegBuf(RIO_BUFFERID riobuf);
-	void PostRecv(int serviceType, RIO_BUF* buf);
+	void PostRecv(int serviceType);
 	int RIONotifyIOCP(RIO_CQ  rioCQ);
 	//
 

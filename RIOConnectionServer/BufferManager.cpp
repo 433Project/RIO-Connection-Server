@@ -55,6 +55,7 @@ void BufferManager::Initialize(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable, D
 
 EXTENDED_RIO_BUF* BufferManager::GetBuffer()
 {
+
 	if (freeBufferIndex.size() <= 0)
 	{
 // 		char* newMemoryArea = AllocateBufferSpace();

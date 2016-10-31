@@ -520,10 +520,11 @@ void RIOManager::DeRegBuf(RIO_BUFFERID riobuf) {
 }
 
 
-void RIOManager::PostRecv(int serviceType, RIO_BUF* buf) {
+void RIOManager::PostRecv(int serviceType) {
+	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
-	bool x = rioFunctions.RIOReceive(connServ.udpRQ, buf, 1, 0, 0);
+	bool x = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, 0);
 }
 
 int RIOManager::RIONotifyIOCP(RIO_CQ rioCQ) {
@@ -541,6 +542,8 @@ void RIOManager::Shutdown() {
 	CloseCQs();
 	CloseIOCPHandles();
 
+	bufferManager.ShutdownCleanup(rioFunctions);
+	
 #ifdef PRINT_MESSAGES
 	PrintMessageFormatter(1, "COMPLETE", " ");
 #endif // PRINT_MESSAGES
@@ -845,6 +848,7 @@ void RIOManager::PrintWindowsErrorMessage() {
 
 RIOManager::~RIOManager()
 {
+	//delete &bufferManager;
 }
 
 /*
