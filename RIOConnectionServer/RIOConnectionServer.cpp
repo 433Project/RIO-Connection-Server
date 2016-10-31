@@ -14,7 +14,7 @@ struct BasicConnectionServerHandles {
 	CQ_Handler cqHandler;
 };
 
-void MainProcess(BasicConnectionServerHandles& connectionServer);
+void MainProcess(BasicConnectionServerHandles* connectionServer);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -91,7 +91,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	//Start threads and keep track of them
 	for (int i = 0; i < 1; i++)
 	{
-		std::thread* thread = new std::thread(MainProcess, connectionServer);
+		std::thread* thread = new std::thread(MainProcess, &connectionServer);
 		threadPool.emplace_back(thread);
 	}
 
@@ -141,7 +141,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	return 0;
 }
 
-void MainProcess(BasicConnectionServerHandles& connectionServer)
+void MainProcess(BasicConnectionServerHandles* connectionServer)
 {
 	//Initiate thread's variables and objects
 	ProcessManager processManager;
@@ -156,9 +156,9 @@ void MainProcess(BasicConnectionServerHandles& connectionServer)
 
 	while (true)
 	{
-		connectionServer.rioManager.RIONotifyIOCP(connectionServer.cqHandler.rio_CQ);
+		connectionServer->rioManager.RIONotifyIOCP(connectionServer->cqHandler.rio_CQ);
 		cout << "Waiting on Completions" << endl;
-		if (!GetQueuedCompletionStatus(connectionServer.iocp, &bytes, &key, &op, INFINITE)) {
+		if (!GetQueuedCompletionStatus(connectionServer->iocp, &bytes, &key, &op, INFINITE)) {
 			//ERROR
 		}
 
