@@ -3,32 +3,59 @@
 #include "RIOManager.h"
 
 
-Instruction ProcessManager::GetInstructions(EXTENDED_RIO_BUF* data)
+std::vector<Instruction>* ProcessManager::GetInstructions(EXTENDED_RIO_BUF* data)
 {
-	AddressInfo receivedInfo;
-	
-	memcpy(&receivedInfo.srcType, (byte*)data->buffer + data->Offset + 4, 4);
-	memcpy(&receivedInfo.srcCode, (byte*)data->buffer + data->Offset + 8, 4);
+	switch (data->socketContext)
+	{
+	case OP_RECEIVE:
+		AddressInfo receivedInfo;
 
-	memcpy(&receivedInfo.dstType, (byte*)data->buffer + data->Offset + 12, 4);
-	memcpy(&receivedInfo.dstCode, (byte*)data->buffer + data->Offset + 16, 4);
+		memcpy(&receivedInfo.srcType, (byte*)data->buffer + data->Offset + 4, 4);
+		memcpy(&receivedInfo.srcCode, (byte*)data->buffer + data->Offset + 8, 4);
 
-	AddressInfo changedInfo = GetManagedInfo(receivedInfo, *data);
+		memcpy(&receivedInfo.dstType, (byte*)data->buffer + data->Offset + 12, 4);
+		memcpy(&receivedInfo.dstCode, (byte*)data->buffer + data->Offset + 16, 4);
 
-	memcpy((byte*)data->buffer + data->Offset + 4, &changedInfo.srcType, 4);
-	memcpy((byte*)data->buffer + data->Offset + 8, &changedInfo.srcCode, 4);
+		AddressInfo changedInfo = GetManagedInfo(receivedInfo, *data);
 
-	memcpy((byte*)data->buffer + data->Offset + 12, &changedInfo.dstType, 4);
-	memcpy((byte*)data->buffer + data->Offset + 16, &changedInfo.dstCode, 4);
+		memcpy((byte*)data->buffer + data->Offset + 4, &changedInfo.srcType, 4);
+		memcpy((byte*)data->buffer + data->Offset + 8, &changedInfo.srcCode, 4);
 
-	Instruction instruction;
-	instruction.buffer = data;
-	instruction.destinationType = changedInfo.dstType;
-	instruction.length = data->messageLength;
-	instruction.socketContext = data->socketContext;
-	instruction.type = SEND;
+		memcpy((byte*)data->buffer + data->Offset + 12, &changedInfo.dstType, 4);
+		memcpy((byte*)data->buffer + data->Offset + 16, &changedInfo.dstCode, 4);
 
-	return instruction;
+		Instruction sendInstruction;
+		sendInstruction.type = SEND;
+		sendInstruction.buffer = data;
+		sendInstruction.destinationType = changedInfo.dstType;
+		sendInstruction.socketContext = data->socketContext;
+
+
+		Instruction receiveInstruction;
+		receiveInstruction.type = RECEIVE;
+		receiveInstruction.buffer = nullptr;
+		receiveInstruction.destinationType = data->srcType;
+		receiveInstruction.socketContext = data->socketContext;
+
+		std::vector<Instruction>* instructions = new std::vector<Instruction>();
+		instructions->push_back(receiveInstruction);
+		instructions->push_back(sendInstruction);
+		return instructions;
+
+
+	case OP_SEND:
+
+		Instruction freeInstruction;
+		receiveInstruction.type = FREEBUFFER;
+		receiveInstruction.buffer = nullptr;
+		receiveInstruction.destinationType = data->srcType;
+		receiveInstruction.socketContext = data->socketContext;
+
+		std::vector<Instruction>* instructions = new std::vector<Instruction>();
+		instructions->push_back(freeInstruction);
+		return instructions;
+	}
+
 }
 
 

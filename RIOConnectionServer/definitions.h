@@ -74,7 +74,6 @@ struct Instruction {
 	int socketContext;		//Destination Code
 	DestinationType destinationType;
 	EXTENDED_RIO_BUF* buffer;
-	int length;
 };
 
 
