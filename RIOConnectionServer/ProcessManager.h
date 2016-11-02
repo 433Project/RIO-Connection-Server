@@ -14,7 +14,7 @@ struct AddressInfo
 class ProcessManager
 {
 public:
-	Instruction GetInstructions(EXTENDED_RIO_BUF* data);
+	std::vector<Instruction>*GetInstructions(EXTENDED_RIO_BUF* data);
 
 	ProcessManager();
 	~ProcessManager();
