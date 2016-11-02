@@ -511,7 +511,18 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 	for (int i = 0; i < numResults; i++)
 	{
 		tempRIOBuf = reinterpret_cast<EXTENDED_RIO_BUF*>(rioResults[i].RequestContext);
-		results.push_back(tempRIOBuf);
+		//Check rioresult structure for errors
+		//NOTE - Information on RIORESULT's Status values is unclear
+		//When I client/server force closes, error code 10054 is received
+		cout << rioResults[i].BytesTransferred << endl;
+		cout << rioResults[i].Status << endl;
+		if (rioResults[i].Status == NO_ERROR) {
+			results.push_back(tempRIOBuf);
+		}
+		else {	//If there was an error on the result, we will kill the connection
+			CloseServiceEntry(tempRIOBuf->srcType, tempRIOBuf->socketContext);
+			bufferManager.FreeBuffer(tempRIOBuf);
+		}
 	}
 
 #ifdef PRINT_MESSAGES
@@ -523,6 +534,87 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 
 int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults) {
 	return GetCompletedResults(results, rioResults, GetMainRIOCQ());
+}
+
+
+//struct Instruction {
+//	InstructionType type;
+//	int socketContext;		//Destination Code
+//	DestinationType destinationType;
+//	EXTENDED_RIO_BUF* buffer;
+//	int length;
+//};
+
+int RIOManager::ProcessInstruction(Instruction instruction) {
+	ServiceList::iterator iter;
+	SocketList::iterator sockIter;
+	SocketList* sockList;
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(0, "RIO MANAGER", "ProcessInstruction", "Determining how to process instruction");
+#endif // PRINT_MESSAGES
+	switch (instruction.type) {
+	case SEND:
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "InstructionType", "SEND Instruction received.");
+#endif // PRINT_MESSAGES
+		iter = serviceList.find(instruction.destinationType);
+		if (iter == serviceList.end()) {
+#ifdef PRINT_MESSAGES
+			PrintMessageFormatter(1, "ERROR", "Send to service does not exist.");
+#endif // PRINT_MESSAGES
+			return -1;		//Service doesn't exist
+		}
+
+		//Get the service entry
+		ConnectionServerService* service;
+		service = &iter->second;
+
+		sockList = service->socketList;
+
+		if (sockList->empty()) {
+#ifdef PRINT_MESSAGES
+			PrintMessageFormatter(1, "ERROR", "Send to service has no entries.");
+#endif // PRINT_MESSAGES
+			return -2;		//No sockets in the list
+		}
+
+		RQ_Handler* rqHandler;
+
+		if (instruction.socketContext == 0) {		//No location specification
+			sockIter = sockList->begin();
+		}
+		else {										//Specific location
+			sockIter = sockList->find(instruction.socketContext);
+			if (sockIter == sockList->end()) {
+#ifdef PRINT_MESSAGES
+				PrintMessageFormatter(1, "ERROR", "Specified destination not found.");
+#endif // PRINT_MESSAGES
+				return -3;		//No specific location found ////////////
+			}
+
+		}
+
+		rqHandler = &sockIter->second;
+		EnterCriticalSection(&rqHandler->criticalSection);
+		if (!rioFunctions.RIOSend(rqHandler->rio_RQ, instruction.buffer, 1, 0, instruction.buffer)) {
+#ifdef PRINT_MESSAGES
+			PrintMessageFormatter(1, "ERROR", "RIOSend failed.");
+			PrintWindowsErrorMessage();
+#endif // PRINT_MESSAGES
+			return -4;			//RIOSend failed
+		}
+		LeaveCriticalSection(&rqHandler->criticalSection);
+
+		break;
+	case RECEIVE:
+		break;
+	case CLOSESOCKET:
+		break;
+	case FREEBUFFER:
+		break;
+	}
+
+	return 0;
 }
 
 ///This function processes an AcceptEx completion by creating a new RIOSocket with the appropriate settings.
@@ -574,6 +666,7 @@ void RIOManager::DeRegBuf(RIO_BUFFERID riobuf) {
 
 void RIOManager::PostRecv(int serviceType) {
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
+	rioBuf->srcType = (DestinationType)serviceType;
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
 	bool x = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, 0);
@@ -974,6 +1067,7 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
+	rioBuf->srcType = (DestinationType)serviceType;
 	return rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, rioBuf);
 }
 
@@ -988,6 +1082,8 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 	ConnectionServerService connServ = iter->second;
 	SocketList::iterator iterSL = connServ.socketList->find(destinationCode);
 	RQ_Handler rqHandler = iterSL->second;
+	rioBuf->srcType = (DestinationType)serviceType;
+	rioBuf->socketContext = destinationCode;
 	return rioFunctions.RIOReceive(rqHandler.rio_RQ, rioBuf, 1, 0, rioBuf);
 }
 
@@ -1041,6 +1137,47 @@ void RIOManager::CloseCQs() {
 	return;
 }
 
+///This function closes a specific entry on a specific service
+void RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
+	ConnectionServerService* connectionServerService;
+	SocketList* sockList;
+	RQ_Handler* rqHandler;
+	SOCKET* socket;
+
+	//Find the service entry
+	ServiceList::iterator iter = serviceList.find(typeCode);
+	if (iter == serviceList.end()) {
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "ERROR", "Can't find service #" + to_string(typeCode));
+#endif // PRINT_MESSAGES
+		return;		//Service doesn't exist
+	}
+
+	connectionServerService = &iter->second;
+	sockList = connectionServerService->socketList;
+
+	//Find the specific entry
+	SocketList::iterator sockIter = sockList->find(socketContext);
+	if (sockIter == sockList->end()) {
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "ERROR", "Service #" + to_string(typeCode), "Can't find entry #" + to_string(socketContext));
+#endif // PRINT_MESSAGES
+		return;		//Service doesn't exist
+	}
+
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "Service #" + to_string(typeCode), "Closing connection with entry #" + to_string(socketContext));
+#endif // PRINT_MESSAGES
+
+	rqHandler = &sockIter->second;
+	closesocket(rqHandler->socket);
+	DeleteCriticalSection(&rqHandler->criticalSection);
+
+	sockList->erase(socketContext);
+
+	return;
+}
+
 ///This function closes all sockets stored within the service list.
 void RIOManager::CloseAllSockets() {
 	ConnectionServerService* connectionServerService;
@@ -1077,6 +1214,7 @@ void RIOManager::CloseAllSockets() {
 			//Close each socket
 			rqHandler = &it->second;
 			closesocket((*rqHandler).socket);
+			DeleteCriticalSection(&rqHandler->criticalSection);
 		}
 
 #ifdef PRINT_MESSAGES

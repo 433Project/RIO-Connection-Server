@@ -154,6 +154,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 	RIORESULT rioResults[1000];					//Maximum rio result load off per RIODequeueCompletion call
 	std::vector<EXTENDED_RIO_BUF*> results;		//Vector of Extended_RIO_BUF structs to give process manager
 	EXTENDED_OVERLAPPED* op = 0;
+	Instruction instruction;
 	DWORD bytes = 0;
 	ULONG_PTR key = 0;
 	BOOL quitTrigger = false;
@@ -178,10 +179,12 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 				cout << "RIO Completion Queue corrupted. . ." << endl;
 			}
 
-			/*for each(auto result in results)
+			for each(auto result in results)
 			{
-				processManager.GetInstructions(result);
-			}*/
+				instruction = processManager.GetInstructions(result);
+				connectionServer->rioManager.ProcessInstruction(instruction);
+			}
+
 
 			//Repost receives
 			for (int i = 0; i < numResults; i++) {

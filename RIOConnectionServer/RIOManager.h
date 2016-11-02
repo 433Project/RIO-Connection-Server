@@ -76,7 +76,7 @@ public:
 
 	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler);
 	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults);
-	//int ProcessInstruction(InstructionType instructionType);
+	int ProcessInstruction(Instruction instruction);
 
 	int ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped);
 	int ResetAcceptCall(EXTENDED_OVERLAPPED* extendedOverlapped);
@@ -107,6 +107,7 @@ private:
 	bool PostReceiveOnUDPService(int serviceType);
 	bool PostReceiveOnTCPService(int serviceType, int destinationCode);
 	int FillAcceptStructures(int typeCode, int numStruct);
+	void CloseServiceEntry(int typeCode, int socketContext);
 	void CloseAllSockets();
 	void CloseIOCPHandles();
 	void CloseCQs();
