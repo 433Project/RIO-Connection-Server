@@ -24,7 +24,8 @@ enum OperationType {
 enum COMPLETION_KEY {
 	CK_QUIT,
 	CK_RIO,
-	CK_ACCEPT
+	CK_ACCEPT,
+	CK_GETINFO
 };
 
 enum DestinationType
@@ -36,9 +37,10 @@ enum DestinationType
 	MONITORING_SERVER
 };
 
-struct EXTENDED_OVERLAPPED : OVERLAPPED {
-	DWORD identifier;
+struct EXTENDED_OVERLAPPED : public OVERLAPPED {
+	int serviceType;
 	SOCKET relevantSocket;
+	char* buffer = new char[(2*(sizeof(sockaddr_in))+32)];
 };
 
 struct CQ_Handler {
