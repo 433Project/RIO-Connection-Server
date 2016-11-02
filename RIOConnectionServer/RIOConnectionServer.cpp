@@ -191,6 +191,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 			break;
 		case CK_ACCEPT:
 			cout << "Received Accept Completion." << endl;
+			//connectionServer->rioManager.ConfigureNewSocket(op);
 			connectionServer->rioManager.CreateRIOSocket(TCPConnection, op->serviceType, op->relevantSocket);
 			connectionServer->rioManager.ResetAcceptCall(op);
 			break;

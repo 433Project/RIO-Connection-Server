@@ -5,6 +5,7 @@
 #include <sstream>
 #include "definitions.h"
 #include "BufferManager.h"
+#include "Ws2tcpip.h"
 
 #define PRINT_MESSAGES
 
@@ -77,6 +78,7 @@ public:
 	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults);
 	//int ProcessInstruction(InstructionType instructionType);
 
+	int ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped);
 	int ResetAcceptCall(EXTENDED_OVERLAPPED* extendedOverlapped);
 
 	int NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped);
@@ -103,6 +105,7 @@ private:
 	HANDLE GetMainIOCP();
 	CQ_Handler GetMainRIOCQ();
 	bool PostReceiveOnUDPService(int serviceType);
+	bool PostReceiveOnTCPService(int serviceType, int destinationCode);
 	int FillAcceptStructures(int typeCode, int numStruct);
 	void CloseAllSockets();
 	void CloseIOCPHandles();

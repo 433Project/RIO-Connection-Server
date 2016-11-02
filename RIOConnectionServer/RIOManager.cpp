@@ -221,7 +221,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		controlCode = SIO_GET_EXTENSION_FUNCTION_POINTER;
 		isListener = true;
 		requiresBind = true;
-		newSocket = WSASocket(AF_INET, type, ipProto, NULL, 0, WSA_FLAG_OVERLAPPED);
+		newSocket = WSASocket(AF_INET, type, ipProto, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
 		break;
 		//Accepted Socket Cases
 	case TCPConnection:
@@ -326,7 +326,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		PrintMessageFormatter(2, "BeginAcceptEx", "Posting an Accept to Service #" + to_string(serviceType));
 #endif // PRINT_MESSAGES
 		//Post-Initial accepts???
-		FillAcceptStructures(serviceType, 10);
+		FillAcceptStructures(serviceType, 1);
 
 	}
 
@@ -407,6 +407,18 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 				PrintMessageFormatter(1, "ERROR", "Could add entry to service.");
 #endif // PRINT_MESSAGES
 				return -9;
+			}
+
+#ifdef PRINT_MESSAGES
+			PrintMessageFormatter(2, "PostTCPReceive", "Posting receives on new service #" + to_string(serviceType));
+#endif // PRINT_MESSAGES
+			for (int y = 0; y < 20; y++) {
+				if (!PostReceiveOnTCPService(serviceType, (int)newSocket)) {
+#ifdef PRINT_MESSAGES
+					PrintMessageFormatter(2, "ERROR", "Failed to Post Receive.");
+					PrintWindowsErrorMessage();
+#endif // PRINT_MESSAGES
+				}
 			}
 		}
 
@@ -571,6 +583,88 @@ int RIOManager::RIONotifyIOCP(RIO_CQ rioCQ) {
 	return rioFunctions.RIONotify(rioCQ);
 }
 
+
+
+int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
+	ServiceList::iterator iter = serviceList.find(extendedOverlapped->serviceType);
+	ConnectionServerService* connServ = &iter->second;
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(1, "setsockopt", "Running SO_UPDATE_ACCEPT_CONTEXT on new connection.");
+#endif // PRINT_MESSAGES
+	if (SOCKET_ERROR == setsockopt(extendedOverlapped->relevantSocket, 
+				SOL_SOCKET, 
+				SO_UPDATE_ACCEPT_CONTEXT, 
+				(char*) &connServ->listeningSocket, sizeof(connServ->listeningSocket))) {
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "ERROR", "setsockopt(SO_UPDATE_ACCEPT_CONTEXT) failed.");
+		PrintWindowsErrorMessage();
+#endif // PRINT_MESSAGES
+		return -1;
+	}
+
+	return 1;
+
+	GUID getAcceptExSockID = WSAID_GETACCEPTEXSOCKADDRS;
+	LPFN_GETACCEPTEXSOCKADDRS getAcceptSockFunc;
+
+	if (NULL != WSAIoctl(
+		socketRIO,
+		SIO_GET_EXTENSION_FUNCTION_POINTER,
+		&getAcceptExSockID,
+		sizeof(GUID),
+		(void**)&getAcceptSockFunc,
+		sizeof(getAcceptSockFunc),
+		&dwBytes,
+		NULL,
+		NULL))
+	{
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to retrieve GetAcceptExSockaddrs.");
+#endif // PRINT_MESSAGES
+		return -2;
+	}
+
+
+	//if (!(acceptExFunction(			////////////
+	//	GetListeningSocket((*extendedOverlapped).serviceType),
+	//	(*extendedOverlapped).relevantSocket,
+	//	extendedOverlapped->buffer,
+	//	0,							//No read
+	//	sizeof(sockaddr_in) + 16,
+	//	sizeof(sockaddr_in) + 16,	//MSDN specifies that dwRemoteAddressLength "Cannot be zero."
+	//	&bytes,
+	//	extendedOverlapped
+	//)))
+
+	sockaddr* local = NULL; 
+	sockaddr* remote = NULL;
+	int sizeLocal = 0;
+	int sizeRemote = 0;
+
+	getAcceptSockFunc(
+		extendedOverlapped->buffer,
+		0,
+		sizeof(sockaddr_in) + 16,
+		sizeof(sockaddr_in) + 16,
+		&local,
+		&sizeLocal,
+		&remote,
+		&sizeRemote);
+
+	cout << sizeLocal << endl;
+	cout << sizeRemote << endl;
+
+//#ifdef PRINT_MESSAGES
+//	//PTSTR buffer;
+//	//InetNtop(AF_INET, &(local->sa_data), buffer, sizeof(buffer));
+//
+//	PrintMessageFormatter(1, "getAcceptSock", "Unloading the address information. . .");
+//	//PrintMessageFormatter(2, "Local Address", *buffer);
+//#endif // PRINT_MESSAGES
+
+
+	return 0;
+}
 
 
 
@@ -881,6 +975,20 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
 	return rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, rioBuf);
+}
+
+
+
+bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
+#ifdef PRINT_MESSAGES
+	PrintMessageFormatter(2, "PostReceive", "Posting Receive on Service #" + to_string(serviceType));
+#endif // PRINT_MESSAGES
+	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
+	ServiceList::iterator iter = serviceList.find(serviceType);
+	ConnectionServerService connServ = iter->second;
+	SocketList::iterator iterSL = connServ.socketList->find(destinationCode);
+	RQ_Handler rqHandler = iterSL->second;
+	return rioFunctions.RIOReceive(rqHandler.rio_RQ, rioBuf, 1, 0, rioBuf);
 }
 
 
