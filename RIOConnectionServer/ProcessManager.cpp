@@ -5,6 +5,7 @@
 
 std::vector<Instruction>* ProcessManager::GetInstructions(EXTENDED_RIO_BUF* data)
 {
+	std::vector<Instruction>* instructions = new std::vector<Instruction>();
 	switch (data->socketContext)
 	{
 	case OP_RECEIVE:
@@ -37,7 +38,6 @@ std::vector<Instruction>* ProcessManager::GetInstructions(EXTENDED_RIO_BUF* data
 		receiveInstruction.destinationType = data->srcType;
 		receiveInstruction.socketContext = data->socketContext;
 
-		std::vector<Instruction>* instructions = new std::vector<Instruction>();
 		instructions->push_back(receiveInstruction);
 		instructions->push_back(sendInstruction);
 		return instructions;

@@ -1,5 +1,6 @@
 #pragma once
 #include "definitions.h"
+#include <vector>
 
 struct EXTENDED_RIO_BUF;
 
