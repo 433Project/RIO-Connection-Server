@@ -153,8 +153,8 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 	ProcessManager processManager;
 	RIORESULT rioResults[1000];					//Maximum rio result load off per RIODequeueCompletion call
 	std::vector<EXTENDED_RIO_BUF*> results;		//Vector of Extended_RIO_BUF structs to give process manager
+	std::vector<Instruction>* instructionSet;
 	EXTENDED_OVERLAPPED* op = 0;
-	Instruction instruction;
 	DWORD bytes = 0;
 	ULONG_PTR key = 0;
 	BOOL quitTrigger = false;
@@ -181,8 +181,11 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 
 			for each(auto result in results)
 			{
-				instruction = processManager.GetInstructions(result);
-				connectionServer->rioManager.ProcessInstruction(instruction);
+				instructionSet = processManager.GetInstructions(result);
+				for (std::vector<Instruction>::iterator it = instructionSet->begin();
+					it != instructionSet->end(); ++it) {
+					connectionServer->rioManager.ProcessInstruction(*it);
+				}
 			}
 
 

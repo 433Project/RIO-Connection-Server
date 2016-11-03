@@ -315,7 +315,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		PrintMessageFormatter(2, "CreateNewService", "Registering the TCP service #" + to_string(serviceType));
 #endif // PRINT_MESSAGES
 		//Create a new service to represent this new listening socket
-		if (CreateNewService(serviceType, port, newSocket, acceptExFunction) < 0) {
+		if (CreateNewService(serviceType, port, false, newSocket, acceptExFunction) < 0) {
 #ifdef PRINT_MESSAGES
 			PrintMessageFormatter(1, "ERROR", "Could not register new service.");
 #endif // PRINT_MESSAGES
@@ -379,7 +379,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 #ifdef PRINT_MESSAGES
 			PrintMessageFormatter(2, "CreateNewService", "Registering the UDP service #" + to_string(serviceType));
 #endif // PRINT_MESSAGES
-			if (CreateNewService(serviceType, port, newSocket, rio_RQ, criticalSection) < 0) {
+			if (CreateNewService(serviceType, port, true, newSocket, rio_RQ, criticalSection) < 0) {
 #ifdef PRINT_MESSAGES
 				PrintMessageFormatter(1, "ERROR", "Could not register new service.");
 #endif // PRINT_MESSAGES
@@ -542,17 +542,20 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 //	int socketContext;		//Destination Code
 //	DestinationType destinationType;
 //	EXTENDED_RIO_BUF* buffer;
-//	int length;
 //};
 
 int RIOManager::ProcessInstruction(Instruction instruction) {
 	ServiceList::iterator iter;
 	SocketList::iterator sockIter;
 	SocketList* sockList;
+	ConnectionServerService* service;
 #ifdef PRINT_MESSAGES
 	PrintMessageFormatter(0, "RIO MANAGER", "ProcessInstruction", "Determining how to process instruction");
 #endif // PRINT_MESSAGES
+
+
 	switch (instruction.type) {
+
 	case SEND:
 #ifdef PRINT_MESSAGES
 		PrintMessageFormatter(1, "InstructionType", "SEND Instruction received.");
@@ -572,9 +575,9 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 		sockList = service->socketList;
 
 		if (sockList->empty()) {
-#ifdef PRINT_MESSAGES
+			#ifdef PRINT_MESSAGES
 			PrintMessageFormatter(1, "ERROR", "Send to service has no entries.");
-#endif // PRINT_MESSAGES
+			#endif // PRINT_MESSAGES
 			return -2;		//No sockets in the list
 		}
 
@@ -606,11 +609,39 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 		LeaveCriticalSection(&rqHandler->criticalSection);
 
 		break;
+
 	case RECEIVE:
+		//Determine what location the receive needs to be placed on and if it's a UDP receive (service) or TCP receive (service entry)
+#ifdef PRINT_MESSAGES
+		PrintMessageFormatter(1, "InstructionType", "RECEIVE Instruction received.");
+#endif // PRINT_MESSAGES
+		iter = serviceList.find(instruction.destinationType);
+		if (iter == serviceList.end()) {
+#ifdef PRINT_MESSAGES
+			PrintMessageFormatter(1, "ERROR", "Send to service does not exist.");
+#endif // PRINT_MESSAGES
+			return -1;		//Service doesn't exist
+		}
+
+		//Get the service entry
+		service = &iter->second;
+
+		//Determine if service is UDP or TCP
+		if (service->isUDPService) {
+			PostReceiveOnUDPService(instruction.destinationType);
+		}
+		else {
+			PostReceiveOnTCPService(instruction.destinationType, instruction.socketContext);
+		}
+
 		break;
+
 	case CLOSESOCKET:
+		CloseServiceEntry(instruction.destinationType, instruction.socketContext);
 		break;
+
 	case FREEBUFFER:
+		bufferManager.FreeBuffer(instruction.buffer);
 		break;
 	}
 
@@ -855,7 +886,7 @@ void RIOManager::Shutdown() {
 
 ///This function creates a new service in the RIO Manager service list.
 ///Note that the receive and send CQs are set to the default value.
-int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction) {
 	if (serviceList.find(typeCode) != serviceList.end()) {
 		return -1;		//Service already exists
 	}
@@ -870,6 +901,7 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningS
 	service.udpRQ = udpRQ;
 	service.udpCriticalSection = udpCriticalSection;
 	service.acceptExFunction = acceptExFunction;
+	service.isUDPService = isUDPService;
 
 	serviceList.insert(std::pair<DWORD, ConnectionServerService>(typeCode, service));
 
@@ -877,23 +909,23 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningS
 
 }
 
-int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection) {
-	return CreateNewService(typeCode, portNumber, listeningSocket, udpRQ, udpCriticalSection, nullptr);
+int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection) {
+	return CreateNewService(typeCode, portNumber, isUDPService, listeningSocket, udpRQ, udpCriticalSection, nullptr);
 }
 
-int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction) {
 	CRITICAL_SECTION emptyCriticalSection;
 	InitializeCriticalSectionAndSpinCount(&emptyCriticalSection, 4000);
-	return CreateNewService(typeCode, portNumber, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, acceptExFunction);
+	return CreateNewService(typeCode, portNumber, isUDPService, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, acceptExFunction);
 }
 
 
 ///This function creates a new service in the RIO Manager service list.
 ///Note that the receive and send CQs are set to the default value.
-int RIOManager::CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket) {
 	CRITICAL_SECTION emptyCriticalSection;
 	InitializeCriticalSectionAndSpinCount(&emptyCriticalSection, 4000);
-	return CreateNewService(typeCode, portNumber, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, nullptr);
+	return CreateNewService(typeCode, portNumber, isUDPService, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, nullptr);
 }
 
 

@@ -14,6 +14,7 @@ typedef deque<EXTENDED_OVERLAPPED> AcceptStructs;
 typedef std::unordered_map<int, RQ_Handler> SocketList;
 
 struct ConnectionServerService {
+	bool isUDPService;
 	int port;
 	SOCKET listeningSocket;
 	CQ_Handler receiveCQ;
@@ -94,10 +95,10 @@ public:
 
 	void Shutdown();
 private:
-	int CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction);
-	int CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection);
-	int CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction);
-	int CreateNewService(int typeCode, int portNumber, SOCKET listeningSocket);
+	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction);
+	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection);
+	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction);
+	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket);
 	//SocketList* GetService(DWORD typeCode);
 	int AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ, SOCKET socket, CRITICAL_SECTION criticalSection);
 	SOCKET GetListeningSocket(int typeCode);
