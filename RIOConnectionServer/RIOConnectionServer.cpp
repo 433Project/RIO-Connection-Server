@@ -215,6 +215,9 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 
 			for each(auto result in results)
 			{
+				cout << "Message came from service #" << result->srcType << endl;
+				cout << "Message came from RQ #" << result->socketContext << endl;
+				cout << "Message was type " << result->operationType << endl;
 				instructionSet = processManager.GetInstructions(result);
 				cout << "Received " << instructionSet->size() << " instructions." << endl;
 				for each (auto instruction in *instructionSet)

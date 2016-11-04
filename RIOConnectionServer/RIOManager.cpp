@@ -582,6 +582,8 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 
 		RQ_Handler* rqHandler;
 
+		PrintMessageFormatter(1, "SOCKETCONTEXT", to_string(instruction.socketContext));
+
 		if (instruction.socketContext == 0) {		//No location specification
 			sockIter = sockList->begin();
 		}
@@ -598,7 +600,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 
 		rqHandler = &sockIter->second;
 		EnterCriticalSection(&rqHandler->criticalSection);
-		instruction.buffer->operationType = OP_RECEIVE;
+		instruction.buffer->operationType = OP_SEND;
 		if (!rioFunctions.RIOSend(rqHandler->rio_RQ, instruction.buffer, 1, 0, instruction.buffer)) {
 
 			PrintMessageFormatter(1, "ERROR", "RIOSend failed.");

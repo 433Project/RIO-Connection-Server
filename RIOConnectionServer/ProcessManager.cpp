@@ -17,6 +17,11 @@ std::vector<Instruction>* ProcessManager::GetInstructions(EXTENDED_RIO_BUF* data
 		memcpy(&receivedInfo.dstType, (byte*)data->buffer + data->Offset + 12, 4);
 		memcpy(&receivedInfo.dstCode, (byte*)data->buffer + data->Offset + 16, 4);
 
+		cout << "srcType " << receivedInfo.srcType << endl;
+		cout << "srcCode " << receivedInfo.srcCode << endl;
+		cout << "dstType " << receivedInfo.dstType << endl;
+		cout << "dstCode " << receivedInfo.dstCode << endl;
+
 		AddressInfo changedInfo = GetManagedInfo(receivedInfo, *data);
 
 		memcpy((byte*)data->buffer + data->Offset + 4, &changedInfo.srcType, 4);
@@ -29,7 +34,7 @@ std::vector<Instruction>* ProcessManager::GetInstructions(EXTENDED_RIO_BUF* data
 		sendInstruction.type = SEND;
 		sendInstruction.buffer = data;
 		sendInstruction.destinationType = changedInfo.dstType;
-		sendInstruction.socketContext = data->socketContext;
+		sendInstruction.socketContext = changedInfo.dstCode;
 
 
 		Instruction receiveInstruction;
