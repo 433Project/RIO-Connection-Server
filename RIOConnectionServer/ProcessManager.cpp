@@ -77,6 +77,7 @@ AddressInfo ProcessManager::GetManagedInfo(AddressInfo receivedInfo, const EXTEN
 	if(matchingServerCount > 3)
 		matchingServerCount = 1;
 
+	result = receivedInfo;
 	result.srcCode = data.socketContext;
 	switch (receivedInfo.srcType)
 	{
