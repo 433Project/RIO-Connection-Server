@@ -17,30 +17,30 @@ int RIOManager::InitializeRIO()
 {
 	// 1. Initialize WinSock
 	WSADATA wsaData;
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(0, "RIO MANAGER", "InitializeRIO", "1. Initializing WinSock. . .");
-#endif // PRINT_MESSAGES
+
 
 	if (0 != ::WSAStartup(0x202, &wsaData)) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "WinSock Initialization Failed.");
-#endif // PRINT_MESSAGES
+
 		return -1;
 	}
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "SUCCESS", " ");
-#endif // PRINT_MESSAGES
+
 
 	// 2. Load RIO Extension Functions
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "InitializeRIO", "2. Loading RIO Extension Functions. . .");
-#endif // PRINT_MESSAGES
+
 	socketRIO = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
 	if (socketRIO == INVALID_SOCKET) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "WSASocket failed to generate socket.");
 		PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 		return -2;
 	}
 
@@ -55,9 +55,9 @@ int RIOManager::InitializeRIO()
 		NULL,
 		NULL))
 	{
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to retrieve RIO extension functions.");
-#endif // PRINT_MESSAGES
+
 		return -3;
 	}
 
@@ -72,27 +72,27 @@ int RIOManager::InitializeRIO()
 		NULL,
 		NULL))
 	{
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to retrieve Accept EX.");
-#endif // PRINT_MESSAGES
+
 		return -4;
 	}
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "SUCCESS", " ");
-#endif // PRINT_MESSAGES
+
 
 	// 3. **Initialize Buffer Manager**//
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "InitializeRIO", "3. Initializing Buffer Mananger. . .");
-#endif // PRINT_MESSAGES
+
 
 	//**Initialize Buffer Manager**//
 	bufferManager.Initialize(rioFunctions, 10000, 1024);
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "COMPLETE", " ");
-#endif // PRINT_MESSAGES
+
 	return 0;
 }
 
@@ -105,21 +105,21 @@ HANDLE RIOManager::CreateIOCP() {
 		//ReportError("CreateIoComplectionPort - Create", true);
 	}
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(0, "RIO MANAGER", "CreateIOCP", "Creating IOCP Handle. . .");
-#endif // PRINT_MESSAGES
+
 
 	//**Register New IOCP with RIO Manager**//
 	iocpList.push_back(hIOCP);
 
-#ifdef PRINT_MESSAGES
+
 	int length = iocpList.size();
 	PrintMessageFormatter(1, "SUCCESS", "Created and Added IOCP #" + to_string(length));
-#endif // PRINT_MESSAGES
 
-#ifdef PRINT_MESSAGES
+
+
 	PrintMessageFormatter(1, "COMPLETE", " ");
-#endif // PRINT_MESSAGES
+
 
 	return hIOCP;
 }
@@ -130,9 +130,9 @@ CQ_Handler RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
 	OVERLAPPED overlapped;
 	RIO_NOTIFICATION_COMPLETION rioNotificationCompletion;
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(0, "RIO MANAGER", "CreateCQ", "Creating RIO Completion Queue. . .");
-#endif // PRINT_MESSAGES
+
 
 	rioNotificationCompletion.Type = RIO_IOCP_COMPLETION;
 	rioNotificationCompletion.Iocp.IocpHandle = hIOCP;
@@ -143,9 +143,9 @@ CQ_Handler RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
 		1000,	//MAX_PENDING_RECEIVES + MAX_PENDING_SENDS
 		&rioNotificationCompletion);
 	if (cqHandler.rio_CQ == RIO_INVALID_CQ) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "CreateCQ failed to create an RIO Completion Queue.");
-#endif // PRINT_MESSAGES
+
 		return cqHandler;
 	}
 
@@ -154,14 +154,14 @@ CQ_Handler RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
 	//*** Need to Store this RIO_CQ handle/Critical Section into the RIO Manager Instance ***
 	rioCQList.push_back(cqHandler);
 
-#ifdef PRINT_MESSAGES
+
 	int length = rioCQList.size();
 	PrintMessageFormatter(1, "SUCCESS", "Created and Added RIO CQ #" + to_string(length));
-#endif // PRINT_MESSAGES
 
-#ifdef PRINT_MESSAGES
+
+
 	PrintMessageFormatter(1, "COMPLETE", " ");
-#endif // PRINT_MESSAGES
+
 
 	return cqHandler;
 }
@@ -195,16 +195,16 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 	LPFN_ACCEPTEX acceptExFunction;
 	RIO_RQ rio_RQ;
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(0, "RIO MANAGER", "CreateRIOSocket", "Creating new RIO Socket. . .");
-#endif // PRINT_MESSAGES
+
 
 	switch (socketType) {
 		//Non-accepted Socket Cases
 	case UDPSocket:
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "TYPE", "UDP Listening Socket at port #" + to_string(port));
-#endif // PRINT_MESSAGES
+
 		type = SOCK_DGRAM;
 		ipProto = IPPROTO_UDP;
 		controlCode = SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER;
@@ -213,9 +213,9 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		newSocket = WSASocket(AF_INET, type, ipProto, NULL, 0, WSA_FLAG_REGISTERED_IO);
 		break;
 	case TCPListener:
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "TYPE", "TCP Listening Socket at port #" + to_string(port));
-#endif // PRINT_MESSAGES
+
 		type = SOCK_STREAM;
 		ipProto = IPPROTO_TCP;
 		controlCode = SIO_GET_EXTENSION_FUNCTION_POINTER;
@@ -225,45 +225,45 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		break;
 		//Accepted Socket Cases
 	case TCPConnection:
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "TYPE", "New TCP Connection for service #" + to_string(serviceType));
-#endif // PRINT_MESSAGES
+
 		controlCode = SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER;
 		isListener = false;
 		requiresBind = false;
 		break;
 	default:
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "Invalid Socket Type.");
-#endif // PRINT_MESSAGES
+
 		return -1; //Incorrect socket Type
 	}
 
 	if (newSocket == INVALID_SOCKET) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "WSASocket failed to generate socket.");
 		PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 		return -2;
 	}
 
 	if (requiresBind) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "BIND", "Binding to port #" + to_string(port));
-#endif // PRINT_MESSAGES
+
 		if (SOCKET_ERROR == ::bind(newSocket, reinterpret_cast<struct sockaddr *>(&socketAddress), sizeof(socketAddress))) {
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(1, "ERROR", "Bind failed.");
 			PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 			return -3;
 		}
 	}
 
 	if (isListener) {			//******Listeners******
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "WSAIoctl", "Loading AcceptEx function Pointer. . .");
-#endif // PRINT_MESSAGES
+
 		if (NULL != WSAIoctl(
 			newSocket,
 			SIO_GET_EXTENSION_FUNCTION_POINTER,
@@ -275,28 +275,28 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 			NULL,
 			NULL))
 		{
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to load extensions.");
 			PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 			return -4;
 		}
 
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "LISTEN", "Initiate listening. . .");
-#endif // PRINT_MESSAGES
+
 
 		if (SOCKET_ERROR == listen(newSocket, 100)) {	//MAX_LISTEN_BACKLOG_SERVER
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(1, "ERROR", "Listen failed.");
 			PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 			return -5;
 		}
 
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "IOCP Queue", "Connecting accept completions to specified IOCP queue. . .");
-#endif // PRINT_MESSAGES
+
 
 		hIOCP = ::CreateIoCompletionPort(
 			(HANDLE)newSocket,
@@ -304,36 +304,34 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 			(ULONG_PTR)CK_ACCEPT,			//////////
 			0);								//MAX_CONCURRENT_THREADS
 		if (NULL == hIOCP) {
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(1, "ERROR", "New socket could not be added to IOCP queue.");
 			PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 			return -6;
 		}
 
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "CreateNewService", "Registering the TCP service #" + to_string(serviceType));
-#endif // PRINT_MESSAGES
+
 		//Create a new service to represent this new listening socket
 		if (CreateNewService(serviceType, port, false, newSocket, acceptExFunction) < 0) {
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(1, "ERROR", "Could not register new service.");
-#endif // PRINT_MESSAGES
+
 			return -8;
 		}
 
-#ifdef PRINT_MESSAGES
 		PrintMessageFormatter(2, "BeginAcceptEx", "Posting an Accept to Service #" + to_string(serviceType));
-#endif // PRINT_MESSAGES
 		//Post-Initial accepts???
 		FillAcceptStructures(serviceType, 1);
 
 	}
 
 	else {		//********Non-Listeners******
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "WSAIoctl", "Loading RIO extension function table. . .");
-#endif // PRINT_MESSAGES
+
 		if (NULL != WSAIoctl(
 			newSocket,
 			controlCode,
@@ -345,10 +343,10 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 			NULL,
 			NULL))
 		{
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to load extensions.");
 			PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 			return -4;
 		}
 
@@ -358,66 +356,66 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 
 		int socketContext = (int)newSocket;
 
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "RIOCreateRequestQueue", "Creating RIO RQ and linking specified RIO CQ. . .");
-#endif // PRINT_MESSAGES
+
 
 		rio_RQ = rioFunctions.RIOCreateRequestQueue(
 			newSocket, 100, 1,				//MAX_PENDING_RECEIVES_UDP, MAX_PENDING_SENDS_UDP
 			100, 1, receiveCQ.rio_CQ,
 			sendCQ.rio_CQ, &socketContext);		//Need to define socket context!!!
 		if (rio_RQ == RIO_INVALID_RQ) {
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(1, "ERROR", "Failed to generate RIO RQ.");
 			PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 			return -7;
 		}
 
 		//Add a socket to a service and Post Initial Receives
 		if (socketType == UDPSocket) {
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(2, "CreateNewService", "Registering the UDP service #" + to_string(serviceType));
-#endif // PRINT_MESSAGES
+
 			if (CreateNewService(serviceType, port, true, newSocket, rio_RQ, criticalSection) < 0) {
-#ifdef PRINT_MESSAGES
+
 				PrintMessageFormatter(1, "ERROR", "Could not register new service.");
-#endif // PRINT_MESSAGES
+
 				return -8;
 			}
 
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(2, "PostUDPReceive", "Posting receives on new service #" + to_string(serviceType));
-#endif // PRINT_MESSAGES
+
 			for (int y = 0; y < 20; y++) {
 				if (!PostReceiveOnUDPService(serviceType)) {
-#ifdef PRINT_MESSAGES
+
 					PrintMessageFormatter(2, "ERROR", "Failed to Post Receive.");
 					PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 				}
 			}
 		}
 		else {
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(2, "AddEntryToService", "Adding the new connection to TCP service #" + to_string(serviceType));
-#endif // PRINT_MESSAGES
+
 			if (AddEntryToService(serviceType, socketContext, rio_RQ, newSocket, criticalSection) < 0) {
-#ifdef PRINT_MESSAGES
+
 				PrintMessageFormatter(1, "ERROR", "Could add entry to service.");
-#endif // PRINT_MESSAGES
+
 				return -9;
 			}
 
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(2, "PostTCPReceive", "Posting receives on new service #" + to_string(serviceType));
-#endif // PRINT_MESSAGES
+
 			for (int y = 0; y < 20; y++) {
 				if (!PostReceiveOnTCPService(serviceType, (int)newSocket)) {
-#ifdef PRINT_MESSAGES
+
 					PrintMessageFormatter(2, "ERROR", "Failed to Post Receive.");
 					PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 				}
 			}
 		}
@@ -426,9 +424,9 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		//PostRecv(serviceType)
 	}
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "COMPLETE", " ");
-#endif // PRINT_MESSAGES
+
 
 	return 0;
 }
@@ -466,38 +464,38 @@ int RIOManager::SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sen
 
 ///This function gets the RIO results from a particular RIO CQ.
 int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler) {
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(0, "RIO MANAGER", "GetCompletedResults", "Dequeuing results from a RIO_CQ. . .");
-#endif // PRINT_MESSAGES
+
 	
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "Enter Critical", "Entering the CQ's critical section.");
-#endif // PRINT_MESSAGES
+
 	//Enter critical section of the CQ we are trying to access
 	EnterCriticalSection(&(cqHandler.criticalSection));
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "RIODequeueCompletion", "Pulling results from the CQ.");
-#endif // PRINT_MESSAGES
+
 	int numResults = rioFunctions.RIODequeueCompletion(cqHandler.rio_CQ, rioResults, 1000); ////Maximum array size
 
 	//Leave the critical section asap so another thread can access asap
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "Leave Critical", "Leaving the CQ's critical section.");
-#endif // PRINT_MESSAGES
+
 	LeaveCriticalSection(&(cqHandler.criticalSection));
 
 	if (numResults == RIO_CORRUPT_CQ) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "RIO_CORRUPT_CQ upon RIODequeueCompletion.");
 		PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 		return -1;
 	}
 	else if (numResults == 0) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "No RIORESULTs found during RIODequeueCompletion.");
-#endif // PRINT_MESSAGES
+
 		return numResults;
 	}
 
@@ -505,9 +503,9 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 
 	results.clear();
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "Results->Bufs", "Determining EXTENDED_RIO_BUF structures from RIORESULTS.");
-#endif // PRINT_MESSAGES
+
 	for (int i = 0; i < numResults; i++)
 	{
 		tempRIOBuf = reinterpret_cast<EXTENDED_RIO_BUF*>(rioResults[i].RequestContext);
@@ -525,9 +523,9 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 		}
 	}
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "COMPLETE", " ");
-#endif // PRINT_MESSAGES
+
 
 	return numResults;
 }
@@ -549,22 +547,22 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 	SocketList::iterator sockIter;
 	SocketList* sockList;
 	ConnectionServerService* service;
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(0, "RIO MANAGER", "ProcessInstruction", "Determining how to process instruction");
-#endif // PRINT_MESSAGES
+
 
 
 	switch (instruction.type) {
 
 	case SEND:
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "InstructionType", "SEND Instruction received.");
-#endif // PRINT_MESSAGES
+
 		iter = serviceList.find(instruction.destinationType);
 		if (iter == serviceList.end()) {
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(1, "ERROR", "Send to service does not exist.");
-#endif // PRINT_MESSAGES
+
 			return -1;		//Service doesn't exist
 		}
 
@@ -575,9 +573,9 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 		sockList = service->socketList;
 
 		if (sockList->empty()) {
-			#ifdef PRINT_MESSAGES
+			
 			PrintMessageFormatter(1, "ERROR", "Send to service has no entries.");
-			#endif // PRINT_MESSAGES
+			
 			return -2;		//No sockets in the list
 		}
 
@@ -589,9 +587,9 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 		else {										//Specific location
 			sockIter = sockList->find(instruction.socketContext);
 			if (sockIter == sockList->end()) {
-#ifdef PRINT_MESSAGES
+
 				PrintMessageFormatter(1, "ERROR", "Specified destination not found.");
-#endif // PRINT_MESSAGES
+
 				return -3;		//No specific location found ////////////
 			}
 
@@ -600,10 +598,10 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 		rqHandler = &sockIter->second;
 		EnterCriticalSection(&rqHandler->criticalSection);
 		if (!rioFunctions.RIOSend(rqHandler->rio_RQ, instruction.buffer, 1, 0, instruction.buffer)) {
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(1, "ERROR", "RIOSend failed.");
 			PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 			return -4;			//RIOSend failed
 		}
 		LeaveCriticalSection(&rqHandler->criticalSection);
@@ -612,14 +610,14 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 
 	case RECEIVE:
 		//Determine what location the receive needs to be placed on and if it's a UDP receive (service) or TCP receive (service entry)
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "InstructionType", "RECEIVE Instruction received.");
-#endif // PRINT_MESSAGES
+
 		iter = serviceList.find(instruction.destinationType);
 		if (iter == serviceList.end()) {
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(1, "ERROR", "Send to service does not exist.");
-#endif // PRINT_MESSAGES
+
 			return -1;		//Service doesn't exist
 		}
 
@@ -712,17 +710,17 @@ int RIOManager::RIONotifyIOCP(RIO_CQ rioCQ) {
 int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
 	ServiceList::iterator iter = serviceList.find(extendedOverlapped->serviceType);
 	ConnectionServerService* connServ = &iter->second;
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "setsockopt", "Running SO_UPDATE_ACCEPT_CONTEXT on new connection.");
-#endif // PRINT_MESSAGES
+
 	if (SOCKET_ERROR == setsockopt(extendedOverlapped->relevantSocket, 
 				SOL_SOCKET, 
 				SO_UPDATE_ACCEPT_CONTEXT, 
 				(char*) &connServ->listeningSocket, sizeof(connServ->listeningSocket))) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "setsockopt(SO_UPDATE_ACCEPT_CONTEXT) failed.");
 		PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 		return -1;
 	}
 
@@ -742,9 +740,9 @@ int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
 		NULL,
 		NULL))
 	{
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to retrieve GetAcceptExSockaddrs.");
-#endif // PRINT_MESSAGES
+
 		return -2;
 	}
 
@@ -778,13 +776,13 @@ int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
 	cout << sizeLocal << endl;
 	cout << sizeRemote << endl;
 
-//#ifdef PRINT_MESSAGES
+//
 //	//PTSTR buffer;
 //	//InetNtop(AF_INET, &(local->sa_data), buffer, sizeof(buffer));
 //
 //	PrintMessageFormatter(1, "getAcceptSock", "Unloading the address information. . .");
 //	//PrintMessageFormatter(2, "Local Address", *buffer);
-//#endif // PRINT_MESSAGES
+//
 
 
 	return 0;
@@ -793,15 +791,15 @@ int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
 
 
 int RIOManager::ResetAcceptCall(EXTENDED_OVERLAPPED* extendedOverlapped) {
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(3, "ResetAcceptCall", "Looking for Service #" + to_string(extendedOverlapped->serviceType));
-#endif // PRINT_MESSAGES
+
 	//Find the service entry
 	ServiceList::iterator iter = serviceList.find(extendedOverlapped->serviceType);
 	if (iter == serviceList.end()) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(3, "Error", "Did not find Service #" + to_string(extendedOverlapped->serviceType));
-#endif // PRINT_MESSAGES
+
 		return INVALID_SOCKET;		//Service doesn't exist
 	}
 
@@ -811,15 +809,15 @@ int RIOManager::ResetAcceptCall(EXTENDED_OVERLAPPED* extendedOverlapped) {
 
 	extendedOverlapped->relevantSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_IP, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
 	if (extendedOverlapped->relevantSocket == INVALID_SOCKET) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(3, "Error", "Could not make new socket");
-#endif // PRINT_MESSAGES
+
 		return -2;
 	}
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(3, "SUCCESS", " ");
-#endif // PRINT_MESSAGES
+
 
 	return BeginAcceptEx(extendedOverlapped, service->acceptExFunction);
 }
@@ -862,9 +860,9 @@ void RIOManager::PrintServiceInformation() {
 
 ///This function closes all resources associated with the RIOManager.
 void RIOManager::Shutdown() {
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(0, "RIO MANAGER", "SHUTDOWN", "Initializing shutdown sequence. . .");
-#endif // PRINT_MESSAGES
+
 
 	CloseAllSockets();
 	CloseCQs();
@@ -872,9 +870,9 @@ void RIOManager::Shutdown() {
 
 	bufferManager.ShutdownCleanup(rioFunctions);
 	
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "COMPLETE", " ");
-#endif // PRINT_MESSAGES
+
 }
 
 
@@ -965,15 +963,15 @@ return 0;
 
 
 SOCKET RIOManager::GetListeningSocket(int typeCode) {
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(3, "GetListeningSocket", "Looking for Service #" + to_string(typeCode));
-#endif // PRINT_MESSAGES
+
 	//Find the service entry
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(3, "Error", "Did not find Service #" + to_string(typeCode));
-#endif // PRINT_MESSAGES
+
 		return INVALID_SOCKET;		//Service doesn't exist
 	}
 
@@ -982,29 +980,29 @@ SOCKET RIOManager::GetListeningSocket(int typeCode) {
 	service = iter->second;
 
 	if (service.listeningSocket == NULL) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(3, "Error", "Invalid Socket with Service #" + to_string(typeCode));
-#endif // PRINT_MESSAGES
+
 		return INVALID_SOCKET;		//Socket Not Assigned
 	}
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(3, "SUCCESS", " ");
-#endif // PRINT_MESSAGES
+
 
 	return service.listeningSocket;
 }
 
 
 int RIOManager::FillAcceptStructures(int typeCode, int numStruct) {
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(3, "FillAcceptStructures", "Looking for Service #" + to_string(typeCode));
-#endif // PRINT_MESSAGES
+
 	//Find the service entry
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(3, "Error", "Did not find Service #" + to_string(typeCode));
-#endif // PRINT_MESSAGES
+
 		return INVALID_SOCKET;		//Service doesn't exist
 	}
 
@@ -1019,9 +1017,9 @@ int RIOManager::FillAcceptStructures(int typeCode, int numStruct) {
 		exOver->serviceType = typeCode;
 		exOver->relevantSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_IP, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
 		if (exOver->relevantSocket == INVALID_SOCKET) {
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(3, "Error", "Number of accepts posted = " + to_string(i));
-#endif // PRINT_MESSAGES
+
 			return i;
 		}
 		service->acceptStructs.push_back(*exOver);
@@ -1040,10 +1038,10 @@ int RIOManager::FillAcceptStructures(int typeCode, int numStruct) {
 		int test = BeginAcceptEx(exOver, service->acceptExFunction);
 		cout << test << endl;
 	}
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(3, "FillAcceptStructures", "Completely filled accepts = " + to_string(numStruct));
 	PrintServiceInformation();
-#endif // PRINT_MESSAGES
+
 
 	return numStruct;
 }
@@ -1064,10 +1062,10 @@ int RIOManager::BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped, LPFN_ACCE
 		extendedOverlapped
 	)))
 	{
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "AcceptEx call failed.");
 		PrintWindowsErrorMessage();
-#endif // PRINT_MESSAGES
+
 		return -1;
 	}
 
@@ -1093,9 +1091,9 @@ CQ_Handler RIOManager::GetMainRIOCQ() {
 
 
 bool RIOManager::PostReceiveOnUDPService(int serviceType) {
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(2, "PostReceive", "Posting Receive on Service #" + to_string(serviceType));
-#endif // PRINT_MESSAGES
+
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
@@ -1106,9 +1104,9 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 
 
 bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(2, "PostReceive", "Posting Receive on Service #" + to_string(serviceType));
-#endif // PRINT_MESSAGES
+
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
@@ -1126,17 +1124,17 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 void RIOManager::CloseIOCPHandles() {
 	HANDLE goodbyeIOCP;
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "CloseIOCPHandles", "Closing all IOCP Handles. . .");
 	int i = 1;
-#endif // PRINT_MESSAGES
+
 
 	while (!iocpList.empty()) {
 		goodbyeIOCP = iocpList.front();
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "LOOP", "Closing IOCP Handle #" + to_string(i));
 		i++;
-#endif // PRINT_MESSAGES
+
 		CloseHandle(goodbyeIOCP);
 		iocpList.pop_front();
 	}
@@ -1148,22 +1146,22 @@ void RIOManager::CloseIOCPHandles() {
 void RIOManager::CloseCQs() {
 	CQ_Handler goodbyeRIOCQ;
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "CloseCQs", "Closing all RIO CQs and critical sections. . .");
 	int i = 1;
-#endif // PRINT_MESSAGES
+
 
 	while (!rioCQList.empty()) {
 		goodbyeRIOCQ = rioCQList.front();
 		rioCQList.pop_front();
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "LOOP", "Closing RIO_CQ #" + to_string(i));
-#endif // PRINT_MESSAGES
+
 		rioFunctions.RIOCloseCompletionQueue(goodbyeRIOCQ.rio_CQ);
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "LOOP", "Closing Critical Section #" + to_string(i));
 		i++;
-#endif // PRINT_MESSAGES
+
 		DeleteCriticalSection(&goodbyeRIOCQ.criticalSection);
 	}
 	return;
@@ -1179,9 +1177,9 @@ void RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 	//Find the service entry
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "Can't find service #" + to_string(typeCode));
-#endif // PRINT_MESSAGES
+
 		return;		//Service doesn't exist
 	}
 
@@ -1191,15 +1189,15 @@ void RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 	//Find the specific entry
 	SocketList::iterator sockIter = sockList->find(socketContext);
 	if (sockIter == sockList->end()) {
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(1, "ERROR", "Service #" + to_string(typeCode), "Can't find entry #" + to_string(socketContext));
-#endif // PRINT_MESSAGES
+
 		return;		//Service doesn't exist
 	}
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "Service #" + to_string(typeCode), "Closing connection with entry #" + to_string(socketContext));
-#endif // PRINT_MESSAGES
+
 
 	rqHandler = &sockIter->second;
 	closesocket(rqHandler->socket);
@@ -1217,20 +1215,20 @@ void RIOManager::CloseAllSockets() {
 	RQ_Handler* rqHandler;
 	SOCKET* socket;
 
-#ifdef PRINT_MESSAGES
+
 	PrintMessageFormatter(1, "CloseAllSockets", "Closing all sockets (and RIO RQs). . .");
 	int i = 1;
 	int j = 1;
-#endif // PRINT_MESSAGES
+
 
 	//iterate through all registered services
 	for (auto it = serviceList.begin(); it != serviceList.end(); ++it) {
 		//Close the service's listening socket
 		connectionServerService = &it->second;
 
-#ifdef PRINT_MESSAGES
+
 		PrintMessageFormatter(2, "LOOP #" + to_string(i), "Closing Service at port #" + to_string((*connectionServerService).port));
-#endif // PRINT_MESSAGES
+
 
 		closesocket((*connectionServerService).listeningSocket);
 
@@ -1238,10 +1236,10 @@ void RIOManager::CloseAllSockets() {
 		//iterate through all sockets associated with the service
 		for (auto it = (*sockList).begin(); it != (*sockList).end(); ++it) {
 
-#ifdef PRINT_MESSAGES
+
 			PrintMessageFormatter(3, "LOOP #" + to_string(i), "Closing Service's Socket #" + to_string(j));
 			j++;
-#endif // PRINT_MESSAGES
+
 
 			//Close each socket
 			rqHandler = &it->second;
@@ -1249,9 +1247,9 @@ void RIOManager::CloseAllSockets() {
 			DeleteCriticalSection(&rqHandler->criticalSection);
 		}
 
-#ifdef PRINT_MESSAGES
+
 		i++;
-#endif // PRINT_MESSAGES
+
 	}
 }
 
@@ -1278,6 +1276,8 @@ void RIOManager::PrintMessageFormatter(int level, string type, string subtype, s
 
 ///This function prints a message to console with a specified format (one box).
 void RIOManager::PrintMessageFormatter(int level, string type, string message) {
+
+
 	if (level == 0) {
 		printf_s("\n");
 	}
@@ -1294,6 +1294,8 @@ void RIOManager::PrintMessageFormatter(int level, string type, string message) {
 	printf_s("%s\n", message.c_str());
 
 	return;
+
+
 }
 
 ///This function prints a box with a word inside.

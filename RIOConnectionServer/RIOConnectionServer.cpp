@@ -212,9 +212,9 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 			for each(auto result in results)
 			{
 				instructionSet = processManager.GetInstructions(result);
-				for (std::vector<Instruction>::iterator it = instructionSet->begin();
-					it != instructionSet->end(); ++it) {
-					connectionServer->rioManager.ProcessInstruction(*it);
+				for each (auto instruction in *instructionSet)
+				{
+					connectionServer->rioManager.ProcessInstruction(instruction);
 				}
 			}
 
