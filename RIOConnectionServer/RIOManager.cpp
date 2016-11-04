@@ -15,6 +15,7 @@ int RIOManager::SetConfiguration(_TCHAR* config[]) {
 ///This function
 int RIOManager::InitializeRIO()
 {
+	InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, 4000);
 	// 1. Initialize WinSock
 	WSADATA wsaData;
 
@@ -556,7 +557,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 
 	case SEND:
 
-		PrintMessageFormatter(1, "InstructionType", "SEND Instruction received.");
+		PrintMessageFormatter(1, "InstructionType", "SEND Instruction received to " + to_string(instruction.destinationType));
 
 		iter = serviceList.find(instruction.destinationType);
 		if (iter == serviceList.end()) {
@@ -597,6 +598,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 
 		rqHandler = &sockIter->second;
 		EnterCriticalSection(&rqHandler->criticalSection);
+		instruction.buffer->operationType = OP_RECEIVE;
 		if (!rioFunctions.RIOSend(rqHandler->rio_RQ, instruction.buffer, 1, 0, instruction.buffer)) {
 
 			PrintMessageFormatter(1, "ERROR", "RIOSend failed.");
@@ -1095,6 +1097,7 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 	PrintMessageFormatter(2, "PostReceive", "Posting Receive on Service #" + to_string(serviceType));
 
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
+	rioBuf->operationType = OP_RECEIVE;
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
 	rioBuf->srcType = (DestinationType)serviceType;
@@ -1108,6 +1111,7 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 	PrintMessageFormatter(2, "PostReceive", "Posting Receive on Service #" + to_string(serviceType));
 
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
+	rioBuf->operationType = OP_RECEIVE;
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
 	SocketList::iterator iterSL = connServ.socketList->find(destinationCode);
@@ -1255,6 +1259,7 @@ void RIOManager::CloseAllSockets() {
 
 ///This function prints a message to console with a specified format (two boxes).
 void RIOManager::PrintMessageFormatter(int level, string type, string subtype, string message) {
+	EnterCriticalSection(&consoleCriticalSection);
 	if (level == 0) {
 		printf_s("\n");
 	}
@@ -1271,12 +1276,13 @@ void RIOManager::PrintMessageFormatter(int level, string type, string subtype, s
 	//Print Message
 	printf_s("%s\n", message.c_str());
 
+	LeaveCriticalSection(&consoleCriticalSection);
 	return;
 }
 
 ///This function prints a message to console with a specified format (one box).
 void RIOManager::PrintMessageFormatter(int level, string type, string message) {
-
+	EnterCriticalSection(&consoleCriticalSection);
 
 	if (level == 0) {
 		printf_s("\n");
@@ -1293,6 +1299,7 @@ void RIOManager::PrintMessageFormatter(int level, string type, string message) {
 	//Print Message
 	printf_s("%s\n", message.c_str());
 
+	LeaveCriticalSection(&consoleCriticalSection);
 	return;
 
 

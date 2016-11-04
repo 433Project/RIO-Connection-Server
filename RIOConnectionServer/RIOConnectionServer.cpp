@@ -102,11 +102,11 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	//enum DestinationType
 	//{
-	//	MATCHING_SERVER = 0,
-	//	MATCHING_CLIENT = 1,
-	//	ROOM_MANAGER = 2,
-	//	PACKET_GENERATOR = 3,
-	//	MONITORING_SERVER = 4
+	//	MATCHING_SERVER = 0,		8433
+	//	MATCHING_CLIENT = 1,		10433 (TCP - packet generator okay)
+	//	ROOM_MANAGER = 2,			9433
+	//	PACKET_GENERATOR = 3,		5050 (UDP)
+	//	MONITORING_SERVER = 4		11433
 	//};
 
 	services.push_back(*(new ServiceData(TCPListener, 0, 8433)));
@@ -116,8 +116,12 @@ int _tmain(int argc, _TCHAR* argv[])
 	services.push_back(*(new ServiceData(TCPListener, 4, 11433)));
 
 	//Create basic UDPSocket at Port 5050
-	connectionServer.rioManager.CreateRIOSocket(UDPSocket, 1, 5050);
-	connectionServer.rioManager.CreateRIOSocket(TCPListener, 2, 10433);
+	//connectionServer.rioManager.CreateRIOSocket(UDPSocket, 1, 5050);
+	//connectionServer.rioManager.CreateRIOSocket(TCPListener, 2, 10433);
+	for each (auto serviceData in services)
+	{
+		connectionServer.rioManager.CreateRIOSocket(serviceData.serviceType, serviceData.serviceCode, serviceData.servicePort);
+	}
 
 	//Start threads and keep track of them
 	for (int i = 0; i < 8; i++)
@@ -212,6 +216,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 			for each(auto result in results)
 			{
 				instructionSet = processManager.GetInstructions(result);
+				cout << "Received " << instructionSet->size() << " instructions." << endl;
 				for each (auto instruction in *instructionSet)
 				{
 					connectionServer->rioManager.ProcessInstruction(instruction);

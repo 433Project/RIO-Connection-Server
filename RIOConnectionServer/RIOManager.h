@@ -38,6 +38,8 @@ class RIOManager
 	LPFN_ACCEPTEX acceptExFunctionMain;
 	BufferManager bufferManager;
 	EXTENDED_OVERLAPPED mainExtendedOverlapped;
+
+	CRITICAL_SECTION consoleCriticalSection;
 	
 	HandleList iocpList;		//Keep track of all IOCP queues for cleanup
 	SOCKET socketRIO;			//A dedicated socket in order to load extension functions
