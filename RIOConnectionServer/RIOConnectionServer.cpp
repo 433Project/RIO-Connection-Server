@@ -14,12 +14,25 @@ struct BasicConnectionServerHandles {
 	CQ_Handler cqHandler;
 };
 
+struct ServiceData {
+	SocketType serviceType;
+	int serviceCode;
+	int servicePort;
+
+	ServiceData(SocketType servType, int code, int port) {
+		serviceType = servType;
+		serviceCode = code;
+		servicePort = port;
+	}
+};
+
 void MainProcess(BasicConnectionServerHandles* connectionServer);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
 	RIOManager rioManager;
 	std::vector<std::thread*> threadPool;
+	std::vector<ServiceData> services;
 
 #ifdef MIK_TEST_SPACE
 	rioManager.InitializeRIO();
@@ -83,8 +96,25 @@ int _tmain(int argc, _TCHAR* argv[])
 	connectionServer.iocp = connectionServer.rioManager.CreateIOCP();
 	CQ_Handler cqHandler = connectionServer.rioManager.CreateCQ();
 
-
 	connectionServer.cqHandler = cqHandler;
+
+	//Load Services
+
+	//enum DestinationType
+	//{
+	//	MATCHING_SERVER = 0,
+	//	MATCHING_CLIENT = 1,
+	//	ROOM_MANAGER = 2,
+	//	PACKET_GENERATOR = 3,
+	//	MONITORING_SERVER = 4
+	//};
+
+	services.push_back(*(new ServiceData(TCPListener, 0, 8433)));
+	services.push_back(*(new ServiceData(TCPListener, 1, 10433)));
+	services.push_back(*(new ServiceData(TCPListener, 2, 9433)));
+	services.push_back(*(new ServiceData(UDPSocket, 3, 5050)));
+	services.push_back(*(new ServiceData(TCPListener, 4, 11433)));
+
 	//Create basic UDPSocket at Port 5050
 	connectionServer.rioManager.CreateRIOSocket(UDPSocket, 1, 5050);
 	connectionServer.rioManager.CreateRIOSocket(TCPListener, 2, 10433);
