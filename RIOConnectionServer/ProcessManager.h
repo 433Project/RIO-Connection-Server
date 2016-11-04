@@ -4,11 +4,12 @@
 
 struct EXTENDED_RIO_BUF;
 
+
 struct AddressInfo
 {
-	DestinationType srcType;
+	SrcDstType srcType;
 	int srcCode;
-	DestinationType dstType;
+	SrcDstType dstType;
 	int dstCode;
 };
 

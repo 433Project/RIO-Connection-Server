@@ -77,14 +77,16 @@ AddressInfo ProcessManager::GetManagedInfo(AddressInfo receivedInfo, const EXTEN
 	if(matchingServerCount > 3)
 		matchingServerCount = 1;
 
+	result = receivedInfo;
 	result.srcCode = data.socketContext;
+
 	switch (receivedInfo.srcType)
 	{
 	case MATCHING_SERVER:
 		break;
 	case MATCHING_CLIENT:
 		break;
-	case ROOM_MANAGER:
+	case ROOM_SERVER:
 		break;
 	case PACKET_GENERATOR:
 		break;

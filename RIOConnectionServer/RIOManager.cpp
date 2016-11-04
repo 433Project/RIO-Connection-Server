@@ -695,7 +695,8 @@ void RIOManager::DeRegBuf(RIO_BUFFERID riobuf) {
 
 void RIOManager::PostRecv(int serviceType) {
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
-	rioBuf->srcType = (DestinationType)serviceType;
+	rioBuf->srcType = (SrcDstType)serviceType;
+	rioBuf->operationType = OP_RECEIVE;
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
 	bool x = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, 0);
@@ -1097,7 +1098,7 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
-	rioBuf->srcType = (DestinationType)serviceType;
+	rioBuf->srcType = (SrcDstType)serviceType;
 	return rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, rioBuf);
 }
 
@@ -1112,7 +1113,7 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 	ConnectionServerService connServ = iter->second;
 	SocketList::iterator iterSL = connServ.socketList->find(destinationCode);
 	RQ_Handler rqHandler = iterSL->second;
-	rioBuf->srcType = (DestinationType)serviceType;
+	rioBuf->srcType = (SrcDstType)serviceType;
 	rioBuf->socketContext = destinationCode;
 	return rioFunctions.RIOReceive(rqHandler.rio_RQ, rioBuf, 1, 0, rioBuf);
 }

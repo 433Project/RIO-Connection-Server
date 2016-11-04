@@ -17,8 +17,8 @@ enum InstructionType {
 };
 
 enum OperationType {
-	OP_SEND,
-	OP_RECEIVE
+	OP_RECEIVE,
+	OP_SEND
 };
 
 enum COMPLETION_KEY {
@@ -27,15 +27,50 @@ enum COMPLETION_KEY {
 	CK_ACCEPT,
 	CK_GETINFO
 };
-
-enum DestinationType
+enum SrcDstType
 {
 	MATCHING_SERVER = 0,
 	MATCHING_CLIENT,
-	ROOM_MANAGER,
+	ROOM_SERVER,
 	PACKET_GENERATOR,
-	MONITORING_SERVER
+	MONITORING_SERVER,
+	CONFIG_SERVER,
+	CONNECTION_SERVER
 };
+
+enum Command
+{
+	MATCH_REQUEST = 0,
+	MATCH_RESPONSE,
+	LATENCY,
+	HEALTH_CHECK,
+	MSLIST_REQUEST,
+	MSLIST_RESPONSE,
+	PG_START,
+	PG_END,
+	ROOM_CREATE_REQUEST,
+	ROOM_CREATE_RESPONSE,
+	ROOM_JOIN_REQUEST,
+	ROOM_JOIN_RESPONSE,
+	GAME_START,
+	GAME_END,
+};
+
+enum Status
+{
+	SUCCESS = 0,
+	FAIL,
+	NONE
+};
+
+
+struct Body
+{
+	Command command;
+	Status status;
+	char* data;
+};
+
 
 struct EXTENDED_OVERLAPPED : public OVERLAPPED {
 	int serviceType;
@@ -62,7 +97,7 @@ struct RQ_Handler {
 struct EXTENDED_RIO_BUF : public RIO_BUF
 {
 	OperationType operationType;
-	DestinationType srcType;
+	SrcDstType srcType;
 	int socketContext;
 	char* buffer;
 	int messageLength;
@@ -72,7 +107,7 @@ struct EXTENDED_RIO_BUF : public RIO_BUF
 struct Instruction {
 	InstructionType type;
 	int socketContext;		//Destination Code
-	DestinationType destinationType;
+	SrcDstType destinationType;
 	EXTENDED_RIO_BUF* buffer;
 };
 
