@@ -3,10 +3,10 @@
 #include "RIOManager.h"
 #include "ProcessManager.h"
 
-//#define MIK_TEST_SPACE
-
 inline void ReportError(
 	const char *pFunction, bool willExit);
+
+CRITICAL_SECTION consoleCriticalSection;
 
 struct BasicConnectionServerHandles {
 	RIOManager rioManager;
@@ -26,7 +26,7 @@ struct ServiceData {
 	}
 };
 
-void MainProcess(BasicConnectionServerHandles* connectionServer);
+void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -34,69 +34,21 @@ int _tmain(int argc, _TCHAR* argv[])
 	std::vector<std::thread*> threadPool;
 	std::vector<ServiceData> services;
 
-#ifdef MIK_TEST_SPACE
-	rioManager.InitializeRIO();
-	HANDLE iocp;
-	iocp = rioManager.CreateIOCP();
-	CQ_Handler rio_CQ = rioManager.CreateCQ();
-	rioManager.CreateRIOSocket(UDPSocket, 1, 5050);
-
-	//Temporary Buffer Creation for testing
-	DWORD offset = 0;
-	DWORD bufSize = 1024;
-	DWORD bufCount = 10;
-	DWORD totalBufSize = 0;
-	DWORD totalBufMade = 100;
-
-	//char* buffer = TEMPORARYAllocateBufferSpace(bufSize, bufCount, totalBufSize, totalBufMade);
-
-	EXTENDED_RIO_BUF* rioBufs = new EXTENDED_RIO_BUF[totalBufMade];
-
-	for (int x = 0; x < totalBufMade; x++) {
-		rioManager.PostRecv(1);
-	}
-	//
-
-	OVERLAPPED* op = 0;
-	DWORD bytes = 0;
-	ULONG_PTR key = 0;
-	int i = 0;
-
-	while (true) {
-		rioManager.RIONotifyIOCP(rio_CQ.rio_CQ);
-		cout << "Waiting on Completions" << endl;
-		if (!GetQueuedCompletionStatus(iocp, &bytes, &key, &op, INFINITE)) {
-			//ERROR
-		}
-		
-		if ((COMPLETION_KEY)key == CK_RIO) {
-			cout << "Received packet from RIO Completion Queue (CK_RIO)" << endl;
-			i++;
-			if (i == 17) {
-				break;
-			}
-
-
-		}
-		else {
-			cout << "Received erroneous message in IOCP queue" << endl;
-		}
-	}
-
-	//rioManager.DeRegBuf(riobufID);
-	rioManager.Shutdown();
-	std::cin.get();
-	return 1;
-#endif // MIK_TEST_SPACE
-
-
 	//***SETUP***
 	BasicConnectionServerHandles connectionServer;
+
+
+	InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, 4000);//
+	connectionServer.rioManager.AssignConsoleCriticalSection(consoleCriticalSection);//
+
 	connectionServer.rioManager.InitializeRIO();
 	connectionServer.iocp = connectionServer.rioManager.CreateIOCP();
 	CQ_Handler cqHandler = connectionServer.rioManager.CreateCQ();
 
 	connectionServer.cqHandler = cqHandler;
+
+
+
 
 	//Load Services
 
@@ -126,7 +78,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	//Start threads and keep track of them
 	for (int i = 0; i < 8; i++)
 	{
-		std::thread* thread = new std::thread(MainProcess, &connectionServer);
+		std::thread* thread = new std::thread(MainProcess, &connectionServer, i);
 		threadPool.emplace_back(thread);
 	}
 
@@ -156,6 +108,10 @@ int _tmain(int argc, _TCHAR* argv[])
 						cout << "Numpad #1 Pressed. . . requesting service information. . ." << endl;
 						PostQueuedCompletionStatus(connectionServer.iocp, 0, CK_GETINFO, &ov);
 						break;
+					case VK_NUMPAD2:
+						cout << "Numpad #2 Pressed. . . requesting thread counter information. . ." << endl;
+						PostQueuedCompletionStatus(connectionServer.iocp, 0, CK_COUNTER, &ov);
+						break;
 					default:
 						cout << "Some other key pressed" << endl;
 						break;
@@ -181,7 +137,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	return 0;
 }
 
-void MainProcess(BasicConnectionServerHandles* connectionServer)
+void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 {
 	//Initiate thread's variables and objects
 	ProcessManager processManager;
@@ -193,18 +149,30 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 	ULONG_PTR key = 0;
 	BOOL quitTrigger = false;
 	ULONG numResults;
+	int sendCount = 0;
+	int receiveCount = 0;
 
 	while (true)
 	{
 		connectionServer->rioManager.RIONotifyIOCP(connectionServer->cqHandler.rio_CQ);
+
+		EnterCriticalSection(&consoleCriticalSection);
 		cout << "Waiting on Completions" << endl;
+		LeaveCriticalSection(&consoleCriticalSection);
+
 		if (!GetQueuedCompletionStatus(connectionServer->iocp, &bytes, &key, (OVERLAPPED**)&op, INFINITE)) {
 			//ERROR
 		}
+
+		EnterCriticalSection(&consoleCriticalSection);
 		cout << "IOCP Event Triggered" << endl;
+		LeaveCriticalSection(&consoleCriticalSection);
+
 		switch ((COMPLETION_KEY)key) {
 		case CK_RIO:
 			numResults = connectionServer->rioManager.GetCompletedResults(results, rioResults);
+
+			EnterCriticalSection(&consoleCriticalSection);
 			cout << "Received " << numResults << " packet(s) from RIO Completion Queue (CK_RIO)" << endl;
 			if (numResults == 0) {
 				cout << "RIO Completion Queue found empty. . ." << endl;
@@ -212,14 +180,30 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 			else if (numResults == RIO_CORRUPT_CQ) {
 				cout << "RIO Completion Queue corrupted. . ." << endl;
 			}
+			LeaveCriticalSection(&consoleCriticalSection);
 
 			for each(auto result in results)
 			{
+
+				EnterCriticalSection(&consoleCriticalSection);
 				cout << "Message came from service #" << result->srcType << endl;
 				cout << "Message came from RQ #" << result->socketContext << endl;
 				cout << "Message was type " << result->operationType << endl;
+				LeaveCriticalSection(&consoleCriticalSection);
+
+				if (result->operationType == OP_RECEIVE) {
+					receiveCount++;
+				}
+				else if (result->operationType == OP_SEND) {
+					sendCount++;
+				}
+
 				instructionSet = processManager.GetInstructions(result);
+
+				EnterCriticalSection(&consoleCriticalSection);
 				cout << "Received " << instructionSet->size() << " instructions." << endl;
+				LeaveCriticalSection(&consoleCriticalSection);
+
 				for each (auto instruction in *instructionSet)
 				{
 					connectionServer->rioManager.ProcessInstruction(instruction);
@@ -241,12 +225,20 @@ void MainProcess(BasicConnectionServerHandles* connectionServer)
 			break;
 		case CK_QUIT:
 			cout << "Received Quit Command from Main Thread." << endl;
+			cout << "\nPrinting Count on Thread #" << threadID << endl;
+			cout << "\tReceives:\t" << receiveCount << endl;
+			cout << "\tSends:\t\t" << sendCount << endl;
 			quitTrigger = true;
 			PostQueuedCompletionStatus(connectionServer->iocp, 0, CK_QUIT, op);
 			break;
 		case CK_GETINFO:
 			cout << "Received Info Request from Main Thread." << endl;
 			connectionServer->rioManager.PrintServiceInformation();
+			break;
+		case CK_COUNTER:
+			cout << "\nPrinting Count on Thread #" << threadID << endl;
+			cout << "\tReceives:\t" << receiveCount << endl;
+			cout << "\tSends:\t\t" << sendCount << endl;
 			break;
 		default:
 			cout << "Received erroneous message in IOCP queue" << endl;
