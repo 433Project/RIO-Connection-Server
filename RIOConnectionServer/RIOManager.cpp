@@ -457,25 +457,15 @@ int RIOManager::SetServiceAddressSpecificity(int serviceType, bool isAddressRequ
 ///This function gets the RIO results from a particular RIO CQ.
 int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler) {
 
-	PrintMessageFormatter(0, "RIO MANAGER", "GetCompletedResults", "Dequeuing results from a RIO_CQ. . .");
-
-	
-
-	PrintMessageFormatter(1, "Enter Critical", "Entering the CQ's critical section.");
 
 	//Enter critical section of the CQ we are trying to access
 	EnterCriticalSection(&(cqHandler.criticalSection));
 
-
-	PrintMessageFormatter(1, "RIODequeueCompletion", "Pulling results from the CQ.");
-
 	int numResults = rioFunctions.RIODequeueCompletion(cqHandler.rio_CQ, rioResults, 1000); ////Maximum array size
 
 	//Leave the critical section asap so another thread can access asap
-
-	PrintMessageFormatter(1, "Leave Critical", "Leaving the CQ's critical section.");
-
 	LeaveCriticalSection(&(cqHandler.criticalSection));
+
 
 	if (numResults == RIO_CORRUPT_CQ) {
 
@@ -495,9 +485,7 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 
 	results.clear();
 
-
-	PrintMessageFormatter(1, "Results->Bufs", "Determining EXTENDED_RIO_BUF structures from RIORESULTS.");
-
+	
 	for (int i = 0; i < numResults; i++)
 	{
 		tempRIOBuf = reinterpret_cast<EXTENDED_RIO_BUF*>(rioResults[i].RequestContext);
@@ -524,18 +512,14 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 			bufferManager.FreeBuffer(tempRIOBuf);
 		}
 		else {	//Passed RIORESULT Tests
-			EnterCriticalSection(&consoleCriticalSection);
+			/*EnterCriticalSection(&consoleCriticalSection);
 			cout << rioResults[i].BytesTransferred << endl;
 			cout << rioResults[i].Status << endl;
-			LeaveCriticalSection(&consoleCriticalSection);
+			LeaveCriticalSection(&consoleCriticalSection);*/
 
 			results.push_back(tempRIOBuf);
 		}
 	}
-
-
-	PrintMessageFormatter(1, "COMPLETE", " ");
-
 
 	return numResults;
 }
@@ -558,21 +542,17 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 	SocketList* sockList;
 	ConnectionServerService* service;
 
-	PrintMessageFormatter(0, "RIO MANAGER", "ProcessInstruction", "Determining how to process instruction");
-
-
-
 	switch (instruction.type) {
 
 	case SEND:
 
-		PrintMessageFormatter(1, "InstructionType", "SEND Instruction received to " + to_string(instruction.destinationType));
+		//PrintMessageFormatter(1, "InstructionType", "SEND Instruction received to " + to_string(instruction.destinationType));
 
 		iter = serviceList.find(instruction.destinationType);
 		if (iter == serviceList.end()) {
-
 			PrintMessageFormatter(1, "ERROR", "Send to service does not exist.");
-
+			PrintMessageFormatter(2, "DST TYPE", to_string(instruction.destinationType));
+			PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
 			return -1;		//Service doesn't exist
 		}
 
@@ -583,19 +563,24 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 		sockList = service->socketList;
 
 		if (sockList->empty()) {
-			
 			PrintMessageFormatter(1, "ERROR", "Send to service has no entries.");
-			
+			PrintMessageFormatter(2, "DST TYPE", to_string(instruction.destinationType));
+			PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
 			return -2;		//No sockets in the list
 		}
 
 		RQ_Handler* rqHandler;
 
-		PrintMessageFormatter(1, "SOCKETCONTEXT", to_string(instruction.socketContext));
+		//PrintMessageFormatter(1, "SOCKETCONTEXT", to_string(instruction.socketContext));
+
 
 		if (instruction.socketContext == 0) {		//No location specification
+
+			//Check if the service requires a specific address
 			if (service->isAddressRequired) {
 				PrintMessageFormatter(1, "ERROR", "No specific destination must be specified. Required on Service at port #" + to_string(service->port));
+				PrintMessageFormatter(2, "DST TYPE", to_string(instruction.destinationType));
+				PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
 				return -5;		//Specific destination required
 			}
 
@@ -613,27 +598,57 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 			}
 			//sockIter = sockList->begin();
 			LeaveCriticalSection(&service->roundRobinCriticalSection);
-			EnterCriticalSection(&consoleCriticalSection);
+			/*EnterCriticalSection(&consoleCriticalSection);
 			cout << "Round-Robin Send to SOCKETCOTEXT: " << sockIter->first << endl;
-			LeaveCriticalSection(&consoleCriticalSection);
+			LeaveCriticalSection(&consoleCriticalSection);*/
+
 		}
 		else {										//Specific location
+
+			//Look for specified destination
 			sockIter = sockList->find(instruction.socketContext);
+
+			//Check if the specified destination was found
 			if (sockIter == sockList->end()) {
 
-				PrintMessageFormatter(1, "ERROR", "Specified destination not found.");
+				//Two cases if the destination wasn't found
+				// 1 - If isAddressRequired flag is checked, report failure
+				// 2 - If not, enable Round-Robin sending
+				if (service->isAddressRequired) {
+					PrintMessageFormatter(1, "ERROR", "Specified destination not found.");
+					PrintMessageFormatter(1, "ERROR", "Round-robin sending not allowed on Service at port #" + to_string(service->port));
+					PrintMessageFormatter(2, "DST TYPE", to_string(instruction.destinationType));
+					PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
+					return -3;		//Specified location not found, round-robin not allowed
+				}
 
-				return -3;		//No specific location found //////////// 
+				EnterCriticalSection(&service->roundRobinCriticalSection);
+				if (service->roundRobinIterator == sockList->end()) {
+					service->roundRobinIterator = sockList->begin();
+				}
+				sockIter = service->roundRobinIterator;
+				service->roundRobinIterator++;
+				if (service->roundRobinIterator == sockList->end()) {
+					service->roundRobinIterator = sockList->begin();
+				}
+				//sockIter = sockList->begin();
+				LeaveCriticalSection(&service->roundRobinCriticalSection);
+				/*EnterCriticalSection(&consoleCriticalSection);
+				cout << "Round-Robin Send to SOCKETCOTEXT: " << sockIter->first << endl;
+				LeaveCriticalSection(&consoleCriticalSection);*/
 			}
 
 		}
 
+		//We now have the location to send
 		rqHandler = &sockIter->second;
 		EnterCriticalSection(&rqHandler->criticalSection);
 		instruction.buffer->operationType = OP_SEND;
 		if (!rioFunctions.RIOSend(rqHandler->rio_RQ, instruction.buffer, 1, 0, instruction.buffer)) {
 
 			PrintMessageFormatter(1, "ERROR", "RIOSend failed.");
+			PrintMessageFormatter(2, "DST TYPE", to_string(instruction.destinationType));
+			PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
 			PrintWindowsErrorMessage();
 
 			return -4;			//RIOSend failed
@@ -645,13 +660,14 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 	case RECEIVE:
 		//Determine what location the receive needs to be placed on and if it's a UDP receive (service) or TCP receive (service entry)
 
-		PrintMessageFormatter(1, "InstructionType", "RECEIVE Instruction received.");
+		//PrintMessageFormatter(1, "InstructionType", "RECEIVE Instruction received.");
 
 		iter = serviceList.find(instruction.destinationType);
 		if (iter == serviceList.end()) {
 
 			PrintMessageFormatter(1, "ERROR", "Send to service does not exist.");
-
+			PrintMessageFormatter(2, "DST TYPE", to_string(instruction.destinationType));
+			PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
 			return -1;		//Service doesn't exist
 		}
 
@@ -1258,7 +1274,7 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 	//If it is pointed to the end, we are fine, but if it isn't then we increment the iterator
 	//Then if we land on the end we be sure to move the iterator back to the beginning
 	EnterCriticalSection(&connectionServerService->roundRobinCriticalSection);
-	if (connectionServerService->roundRobinIterator != sockList->end()) {
+	if (!(connectionServerService->roundRobinIterator == sockList->end())) {
 		if (connectionServerService->roundRobinIterator->first == socketContext) {
 			connectionServerService->roundRobinIterator++;
 			if (connectionServerService->roundRobinIterator == sockList->end()) {
