@@ -729,7 +729,8 @@ void RIOManager::DeRegBuf(RIO_BUFFERID riobuf) {
 
 void RIOManager::PostRecv(int serviceType) {
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
-	rioBuf->srcType = (DestinationType)serviceType;
+	rioBuf->srcType = (SrcDstType)serviceType;
+	rioBuf->operationType = OP_RECEIVE;
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
 	bool x = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, 0);
@@ -1136,7 +1137,8 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 	rioBuf->operationType = OP_RECEIVE;
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
-	rioBuf->srcType = (DestinationType)serviceType;
+
+	rioBuf->srcType = (SrcDstType)serviceType;
 	EnterCriticalSection(&connServ.udpCriticalSection);
 	bool result = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, rioBuf);
 	LeaveCriticalSection(&connServ.udpCriticalSection);
@@ -1158,7 +1160,7 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 	ConnectionServerService connServ = iter->second;
 	SocketList::iterator iterSL = connServ.socketList->find(destinationCode);
 	RQ_Handler rqHandler = iterSL->second;
-	rioBuf->srcType = (DestinationType)serviceType;
+	rioBuf->srcType = (SrcDstType)serviceType;
 	rioBuf->socketContext = destinationCode;
 	EnterCriticalSection(&rqHandler.criticalSection);
 	bool result = rioFunctions.RIOReceive(rqHandler.rio_RQ, rioBuf, 1, 0, rioBuf);
@@ -1253,14 +1255,15 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 	DeleteCriticalSection(&rqHandler->criticalSection);
 
 	//Be sure that the round-robin iterator is moved if this entry was currently pointed to
+	//If it is pointed to the end, we are fine, but if it isn't then we increment the iterator
+	//Then if we land on the end we be sure to move the iterator back to the beginning
 	EnterCriticalSection(&connectionServerService->roundRobinCriticalSection);
-	if (connectionServerService->roundRobinIterator == sockList->end()) {
-		connectionServerService->roundRobinIterator = sockList->begin();
-	}
-	if (connectionServerService->roundRobinIterator->first == socketContext) {
-		connectionServerService->roundRobinIterator++;
-		if (connectionServerService->roundRobinIterator == sockList->end()) {
-			connectionServerService->roundRobinIterator = sockList->begin();
+	if (connectionServerService->roundRobinIterator != sockList->end()) {
+		if (connectionServerService->roundRobinIterator->first == socketContext) {
+			connectionServerService->roundRobinIterator++;
+			if (connectionServerService->roundRobinIterator == sockList->end()) {
+				connectionServerService->roundRobinIterator = sockList->begin();
+			}
 		}
 	}
 	LeaveCriticalSection(&connectionServerService->roundRobinCriticalSection);
