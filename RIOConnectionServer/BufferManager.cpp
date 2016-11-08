@@ -26,7 +26,7 @@ BufferManager::~BufferManager()
 
 void BufferManager::Initialize(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable, DWORD bufferCount, DWORD bufferSize)
 {
-
+	InitializeCriticalSectionAndSpinCount(&bufferCriticalSection, 4000);
 	DWORD totalBufferSize = 0;
 	DWORD totalBufferCount = 0;
 	char* newMemoryArea = AllocateBufferSpace(bufferCount, bufferSize, totalBufferSize, totalBufferCount);
@@ -55,7 +55,7 @@ void BufferManager::Initialize(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable, D
 
 EXTENDED_RIO_BUF* BufferManager::GetBuffer()
 {
-
+	EnterCriticalSection(&bufferCriticalSection);
 	if (freeBufferIndex.size() <= 0)
 	{
 // 		char* newMemoryArea = AllocateBufferSpace();
@@ -67,10 +67,12 @@ EXTENDED_RIO_BUF* BufferManager::GetBuffer()
 // 			buffer->BufferId = id;
 // 			bufferPool.push_back(buffer);
 // 		}
+		LeaveCriticalSection(&bufferCriticalSection);
 		return nullptr;
 	}
 	int index = freeBufferIndex.front();
 	freeBufferIndex.pop();
+	LeaveCriticalSection(&bufferCriticalSection);
 
 	return bufferPool[index];
 }
