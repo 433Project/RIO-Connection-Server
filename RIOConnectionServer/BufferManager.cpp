@@ -83,7 +83,9 @@ void BufferManager::FreeBuffer(EXTENDED_RIO_BUF* buffer)
 	buffer->socketContext = 0;
 
 	int bufferIndex = buffer->Offset / bufferSize;
+	EnterCriticalSection(&bufferCriticalSection);
 	freeBufferIndex.push(bufferIndex);
+	LeaveCriticalSection(&bufferCriticalSection);
 }
 
 void BufferManager::ShutdownCleanup(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable)
