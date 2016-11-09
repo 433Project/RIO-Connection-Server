@@ -220,12 +220,6 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 				}
 			}
 
-
-			//Repost receives
-			for (int i = 0; i < numResults; i++) {
-				connectionServer->rioManager.PostRecv(1);
-			}
-
 			break;
 		case CK_ACCEPT:
 			//cout << "Received Accept Completion." << endl;
