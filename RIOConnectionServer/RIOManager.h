@@ -7,7 +7,7 @@
 #include "BufferManager.h"
 #include "Ws2tcpip.h"
 
-#define PRINT_MESSAGES
+//#define PRINT_MESSAGES
 
 typedef deque<EXTENDED_OVERLAPPED> AcceptStructs;
 
@@ -15,6 +15,7 @@ typedef std::unordered_map<int, RQ_Handler> SocketList;
 
 struct ConnectionServerService {
 	bool isUDPService;
+	bool isAddressRequired;
 	int port;
 	SOCKET listeningSocket;
 	CQ_Handler receiveCQ;
@@ -24,6 +25,8 @@ struct ConnectionServerService {
 	LPFN_ACCEPTEX acceptExFunction;
 	AcceptStructs acceptStructs;
 	SocketList* socketList;
+	SocketList::iterator roundRobinIterator;
+	CRITICAL_SECTION roundRobinCriticalSection;
 };
 
 typedef std::unordered_map<DWORD, ConnectionServerService> ServiceList;
@@ -76,6 +79,7 @@ public:
 	//int CreateRIOSocket(SocketType socketType);																				//Any Type with default values
 
 	int SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sendCQ);
+	int SetServiceAddressSpecificity(int serviceType, bool isAddressRequired);
 
 	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler);
 	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults);
@@ -91,6 +95,7 @@ public:
 	void DeRegBuf(RIO_BUFFERID riobuf);
 	void PostRecv(int serviceType);
 	int RIONotifyIOCP(RIO_CQ  rioCQ);
+	void AssignConsoleCriticalSection(CRITICAL_SECTION critSec);
 	//
 
 	void PrintServiceInformation();
@@ -110,7 +115,7 @@ private:
 	bool PostReceiveOnUDPService(int serviceType);
 	bool PostReceiveOnTCPService(int serviceType, int destinationCode);
 	int FillAcceptStructures(int typeCode, int numStruct);
-	void CloseServiceEntry(int typeCode, int socketContext);
+	int CloseServiceEntry(int typeCode, int socketContext);
 	void CloseAllSockets();
 	void CloseIOCPHandles();
 	void CloseCQs();

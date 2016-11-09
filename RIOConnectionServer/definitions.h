@@ -25,7 +25,8 @@ enum COMPLETION_KEY {
 	CK_QUIT,
 	CK_RIO,
 	CK_ACCEPT,
-	CK_GETINFO
+	CK_GETINFO,
+	CK_COUNTER
 };
 enum SrcDstType
 {

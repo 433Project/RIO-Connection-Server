@@ -4,6 +4,8 @@
 
 class BufferManager
 {
+	CRITICAL_SECTION bufferCriticalSection;
+
 public:
 	BufferManager();
 	~BufferManager();
