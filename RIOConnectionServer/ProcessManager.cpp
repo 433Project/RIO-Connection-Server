@@ -49,12 +49,11 @@ std::vector<Instruction>* ProcessManager::GetInstructions(EXTENDED_RIO_BUF* data
 
 
 	case OP_SEND:
-
 		Instruction freeInstruction;
-		receiveInstruction.type = FREEBUFFER;
-		receiveInstruction.buffer = nullptr;
-		receiveInstruction.destinationType = data->srcType;
-		receiveInstruction.socketContext = data->socketContext;
+		freeInstruction.type = FREEBUFFER;
+		freeInstruction.buffer = data;
+		freeInstruction.destinationType = data->srcType;
+		freeInstruction.socketContext = data->socketContext;
 
 		instructions->push_back(freeInstruction);
 		return instructions;

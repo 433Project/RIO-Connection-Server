@@ -695,6 +695,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 		break;
 
 	case FREEBUFFER:
+		//cout << "RIO Manager found FreeBuffer command" << endl;
 		bufferManager.FreeBuffer(instruction.buffer);
 		break;
 	}
