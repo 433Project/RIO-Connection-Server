@@ -114,6 +114,10 @@ int _tmain(int argc, _TCHAR* argv[])
 						cout << "Numpad #2 Pressed. . . requesting thread counter information. . ." << endl;
 						PostQueuedCompletionStatus(connectionServer.iocp, 0, CK_COUNTER, &ov);
 						break;
+					case VK_NUMPAD3:
+						cout << "Numpad #3 Pressed. . . requesting buffer usage statistics. . ." << endl;
+						PostQueuedCompletionStatus(connectionServer.iocp, 0, CK_BUFINFO, &ov);
+						break;
 					default:
 						cout << "Some other key pressed" << endl;
 						break;
@@ -243,6 +247,9 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 			cout << "\nPrinting Count on Thread #" << threadID << endl;
 			cout << "\tReceives:\t" << receiveCount << endl;
 			cout << "\tSends:\t\t" << sendCount << endl;
+			break;
+		case CK_BUFINFO:
+			connectionServer->rioManager.PrintBufferUsageStatistics();
 			break;
 		default:
 			cout << "ERROR: Received erroneous message in IOCP queue" << endl;

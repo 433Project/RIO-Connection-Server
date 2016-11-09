@@ -927,6 +927,12 @@ void RIOManager::PrintServiceInformation() {
 	}
 }
 
+
+void RIOManager::PrintBufferUsageStatistics() {
+	bufferManager.PrintBufferState();
+	return;
+}
+
 ///This function closes all resources associated with the RIOManager.
 void RIOManager::Shutdown() {
 
