@@ -99,6 +99,7 @@ public:
 	//
 
 	void PrintServiceInformation();
+	void PrintBufferUsageStatistics();
 
 	void Shutdown();
 private:
