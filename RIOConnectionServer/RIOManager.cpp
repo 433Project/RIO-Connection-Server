@@ -558,7 +558,8 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 			PrintMessageFormatter(2, "SRC CODE", to_string(instruction.buffer->socketContext));
 			PrintMessageFormatter(2, "OP TYPE", to_string(instruction.buffer->operationType));
 			PrintMessageFormatter(2, "MSG LENGTH", to_string(instruction.buffer->messageLength));
-			
+
+			bufferManager.FreeBuffer(instruction.buffer);
 			return -1;		//Service doesn't exist
 		}
 
@@ -572,6 +573,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 			PrintMessageFormatter(1, "ERROR", "Send to service has no entries.");
 			PrintMessageFormatter(2, "DST TYPE", to_string(instruction.destinationType));
 			PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
+			bufferManager.FreeBuffer(instruction.buffer);
 			return -2;		//No sockets in the list
 		}
 
@@ -584,9 +586,10 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 
 			//Check if the service requires a specific address
 			if (service->isAddressRequired) {
-				PrintMessageFormatter(1, "ERROR", "No specific destination must be specified. Required on Service at port #" + to_string(service->port));
+				PrintMessageFormatter(1, "ERROR", "No specific destination must be specified for SEND. Required on Service at port #" + to_string(service->port));
 				PrintMessageFormatter(2, "DST TYPE", to_string(instruction.destinationType));
 				PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
+				bufferManager.FreeBuffer(instruction.buffer);
 				return -5;		//Specific destination required
 			}
 
@@ -621,10 +624,11 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 				// 1 - If isAddressRequired flag is checked, report failure
 				// 2 - If not, enable Round-Robin sending
 				if (service->isAddressRequired) {
-					PrintMessageFormatter(1, "ERROR", "Specified destination not found.");
+					PrintMessageFormatter(1, "ERROR", "Specified destination not found for SEND.");
 					PrintMessageFormatter(1, "ERROR", "Round-robin sending not allowed on Service at port #" + to_string(service->port));
 					PrintMessageFormatter(2, "DST TYPE", to_string(instruction.destinationType));
 					PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
+					bufferManager.FreeBuffer(instruction.buffer);
 					return -3;		//Specified location not found, round-robin not allowed
 				}
 
@@ -657,6 +661,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 			PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
 			PrintWindowsErrorMessage();
 
+			bufferManager.FreeBuffer(instruction.buffer);
 			return -4;			//RIOSend failed
 		}
 		LeaveCriticalSection(&rqHandler->criticalSection);
@@ -1173,6 +1178,10 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 	EnterCriticalSection(&connServ.udpCriticalSection);
 	bool result = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, rioBuf);
 	LeaveCriticalSection(&connServ.udpCriticalSection);
+	
+	if (result == false) {
+		bufferManager.FreeBuffer(rioBuf);
+	}
 
 	return result;
 }
@@ -1199,6 +1208,11 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 	EnterCriticalSection(&rqHandler.criticalSection);
 	bool result = rioFunctions.RIOReceive(rqHandler.rio_RQ, rioBuf, 1, 0, rioBuf);
 	LeaveCriticalSection(&rqHandler.criticalSection);
+
+	if (result == false) {
+
+		bufferManager.FreeBuffer(rioBuf);
+	}
 
 	return result;
 }

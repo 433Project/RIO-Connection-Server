@@ -157,6 +157,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 	ULONG numResults;
 	int sendCount = 0;
 	int receiveCount = 0;
+	int freeBufferCount = 0;
 
 	while (true)
 	{
@@ -220,6 +221,9 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 
 				for each (auto instruction in *instructionSet)
 				{
+					if (instruction.type == FREEBUFFER) {
+						freeBufferCount++;
+					}
 					connectionServer->rioManager.ProcessInstruction(instruction);
 				}
 			}
@@ -236,6 +240,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 			cout << "\nPrinting Count on Thread #" << threadID << endl;
 			cout << "\tReceives:\t" << receiveCount << endl;
 			cout << "\tSends:\t\t" << sendCount << endl;
+			cout << "\tBufferFrees:\t" << freeBufferCount << endl;
 			quitTrigger = true;
 			PostQueuedCompletionStatus(connectionServer->iocp, 0, CK_QUIT, op);
 			break;
@@ -247,6 +252,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 			cout << "\nPrinting Count on Thread #" << threadID << endl;
 			cout << "\tReceives:\t" << receiveCount << endl;
 			cout << "\tSends:\t\t" << sendCount << endl;
+			cout << "\tBufferFrees:\t" << freeBufferCount << endl;
 			break;
 		case CK_BUFINFO:
 			connectionServer->rioManager.PrintBufferUsageStatistics();
