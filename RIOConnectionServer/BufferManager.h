@@ -15,6 +15,8 @@ public:
 	void FreeBuffer(EXTENDED_RIO_BUF* buffer);
 	void ShutdownCleanup(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable);
 
+	void PrintBufferState();
+
 private:
 	char* AllocateBufferSpace(const DWORD bufCount, const DWORD bufSize, DWORD& totalBufferSize, DWORD& totalBufferCount);
 

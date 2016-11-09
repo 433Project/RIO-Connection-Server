@@ -91,6 +91,14 @@ void BufferManager::ShutdownCleanup(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTab
 	rioFuntionsTable.RIODeregisterBuffer(rioBuffers[0].first);
 }
 
+void BufferManager::PrintBufferState()
+{
+	std::cout << "========================= Buffer State ============================" << std::endl;
+	std::cout << "Buffer Usage: " << freeBufferIndex.size() / bufferPool.size() * 100 << "%" << std::endl;
+	std::cout << "Buffer On Use: " << (bufferPool.size() - freeBufferIndex.size()) << std::endl;
+	std::cout << "Free Buffer: " << freeBufferIndex.size() << std::endl;
+}
+
 char* BufferManager::AllocateBufferSpace(const DWORD bufCount, const DWORD bufSize, DWORD& totalBufferSize, DWORD& totalBufferCount)
 {
 	SYSTEM_INFO systemInfo;
