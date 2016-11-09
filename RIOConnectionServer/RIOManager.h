@@ -93,7 +93,6 @@ public:
 	//TEMPS
 	RIO_BUFFERID RegBuf(char* buffer, DWORD length);
 	void DeRegBuf(RIO_BUFFERID riobuf);
-	void PostRecv(int serviceType);
 	int RIONotifyIOCP(RIO_CQ  rioCQ);
 	void AssignConsoleCriticalSection(CRITICAL_SECTION critSec);
 	//

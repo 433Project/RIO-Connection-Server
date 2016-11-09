@@ -369,7 +369,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 
 			for (int y = 0; y < 10000; y++) {
 				if (!PostReceiveOnUDPService(serviceType)) {
-					PrintMessageFormatter(2, "ERROR", "Failed to Post Receive.");
+					PrintMessageFormatter(2, "ERROR", "Failed to Post Receive on new UDP service.");
 					PrintWindowsErrorMessage();
 
 				}
@@ -387,7 +387,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 			for (int y = 0; y < 10000; y++) {
 				if (!PostReceiveOnTCPService(serviceType, (int)newSocket)) {
 
-					PrintMessageFormatter(2, "ERROR", "Failed to Post Receive.");
+					PrintMessageFormatter(2, "ERROR", "Failed to Post Receive on new TCP entry.");
 					PrintWindowsErrorMessage();
 
 				}
@@ -488,11 +488,12 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 		tempRIOBuf = reinterpret_cast<EXTENDED_RIO_BUF*>(rioResults[i].RequestContext);
 		//Check rioresult structure for errors
 		//NOTE - Information on RIORESULT's Status values is unclear
-		//When I client/server force closes, error code 10054 is received
+		//When I client/server force closes, error code 10054 is received (WSAECONNRESET - connection reset by pear)
+		//10022 (WSAEINVAL - Invalid Argument)
 		if (tempRIOBuf == nullptr) {
 			EnterCriticalSection(&consoleCriticalSection);
 			cout << "ERROR --- Could not obtain RequestContext from completion. . ." << endl;
-			cout << "\tFrom Socket: " + to_string(rioResults[i].SocketContext) << endl; 
+			cout << "\tSource Code: " + to_string(rioResults[i].SocketContext) << endl; 
 			cout << "\tSTATUS: " + to_string(rioResults[i].Status) << endl;
 			LeaveCriticalSection(&consoleCriticalSection);
 			continue;
@@ -504,10 +505,10 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 				LeaveCriticalSection(&consoleCriticalSection);
 			}
 			bufferManager.FreeBuffer(tempRIOBuf);
-		} else if (rioResults[i].BytesTransferred == 0) {
+		} else if (rioResults[i].BytesTransferred <= 0) {
 			if (CloseServiceEntry(tempRIOBuf->srcType, tempRIOBuf->socketContext) >= 0) {
 				EnterCriticalSection(&consoleCriticalSection);
-				cout << "ERROR from RIORESULT Bytes Transferred = 0" << endl;
+				cout << "ERROR from RIORESULT Bytes Transferred <= 0" << endl;
 				LeaveCriticalSection(&consoleCriticalSection);
 			}
 			bufferManager.FreeBuffer(tempRIOBuf);
@@ -754,15 +755,6 @@ void RIOManager::DeRegBuf(RIO_BUFFERID riobuf) {
 	return;
 }
 
-
-void RIOManager::PostRecv(int serviceType) {
-	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
-	rioBuf->srcType = (SrcDstType)serviceType;
-	rioBuf->operationType = OP_RECEIVE;
-	ServiceList::iterator iter = serviceList.find(serviceType);
-	ConnectionServerService connServ = iter->second;
-	bool x = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, 0);
-}
 
 int RIOManager::RIONotifyIOCP(RIO_CQ rioCQ) {
 	return rioFunctions.RIONotify(rioCQ);
@@ -1175,8 +1167,15 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 
 	rioBuf->srcType = (SrcDstType)serviceType;
 
+	bool result;
+
 	EnterCriticalSection(&connServ.udpCriticalSection);
-	bool result = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, rioBuf);
+	try {
+		result = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, rioBuf);
+	}
+	catch (const std::exception &e) {
+		PrintMessageFormatter(1, "ERROR", "Could not post receive. No Buffers available. UDP Service #" + to_string(serviceType));
+	}
 	LeaveCriticalSection(&connServ.udpCriticalSection);
 	
 	if (result == false) {
@@ -1190,23 +1189,38 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 
 bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 
+	if (destinationCode == 0) {
+		PrintMessageFormatter(1, "ERROR", "Could not post receive. Erroneous destination code on TCP Service of value #" + to_string(serviceType));
+		return false;
+	}
+	
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
 	if (rioBuf == nullptr) {
 		PrintMessageFormatter(1, "ERROR", "Could not post receive. No Buffers available. TCP Service #" + to_string(serviceType));
-		PrintMessageFormatter(1, "DST CODE", to_string(destinationCode));
+		PrintMessageFormatter(2, "DST CODE", to_string(destinationCode));
 		return false;
 	}
 
 	rioBuf->operationType = OP_RECEIVE;
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
+	//
 	SocketList::iterator iterSL = connServ.socketList->find(destinationCode);
 	RQ_Handler rqHandler = iterSL->second;
+	//
 	rioBuf->srcType = (SrcDstType)serviceType;
 	rioBuf->socketContext = destinationCode;
 
+	bool result;
+
 	EnterCriticalSection(&rqHandler.criticalSection);
-	bool result = rioFunctions.RIOReceive(rqHandler.rio_RQ, rioBuf, 1, 0, rioBuf);
+	try {
+		result = rioFunctions.RIOReceive(rqHandler.rio_RQ, rioBuf, 1, 0, rioBuf);
+	}
+	catch (const std::exception &e) {
+		PrintMessageFormatter(1, "ERROR", "Could not post receive. No Buffers available. TCP Service #" + to_string(serviceType));
+		PrintMessageFormatter(2, "DST CODE", to_string(destinationCode));
+	}
 	LeaveCriticalSection(&rqHandler.criticalSection);
 
 	if (result == false) {
