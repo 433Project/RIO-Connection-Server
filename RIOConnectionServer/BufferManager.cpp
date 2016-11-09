@@ -79,6 +79,10 @@ EXTENDED_RIO_BUF* BufferManager::GetBuffer()
 
 void BufferManager::FreeBuffer(EXTENDED_RIO_BUF* buffer)
 {
+	if (buffer == nullptr)
+	{
+		cout << "buffer is nullptr" << endl;
+	}
 	buffer->messageLength = 0;
 	buffer->socketContext = 0;
 
