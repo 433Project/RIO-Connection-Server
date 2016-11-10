@@ -16,7 +16,8 @@ int RIOManager::SetConfiguration(_TCHAR* config[]) {
 ///This function loads WinSock and initiates the RIOManager basic needs such as registered buffers.
 int RIOManager::InitializeRIO()
 {
-	
+	InitializeCriticalSectionAndSpinCount(&serviceListCriticalSection, 4000);
+
 	// 1. Initialize WinSock
 	WSADATA wsaData;
 
@@ -417,10 +418,12 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 ///This function allows one to customize the receive/send CQ of a particular service.
 int RIOManager::SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sendCQ) {
 	//Find the service entry
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
 		return -1;		//Service doesn't exist
 	}
+	LeaveCriticalSection(&serviceListCriticalSection);
 
 	//Get the service entry
 	ConnectionServerService service;
@@ -436,10 +439,12 @@ int RIOManager::SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sen
 ///to a message to a service
 int RIOManager::SetServiceAddressSpecificity(int serviceType, bool isAddressRequired) {
 	//Find the service entry
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	if (iter == serviceList.end()) {
 		return -1;		//Service doesn't exist
 	}
+	LeaveCriticalSection(&serviceListCriticalSection);
 
 	//Get the service entry
 	ConnectionServerService service;
@@ -550,6 +555,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 
 		//PrintMessageFormatter(1, "InstructionType", "SEND Instruction received to " + to_string(instruction.destinationType));
 
+		EnterCriticalSection(&serviceListCriticalSection);
 		iter = serviceList.find(instruction.destinationType);
 		if (iter == serviceList.end()) {
 			PrintMessageFormatter(1, "ERROR", "Send to service does not exist.");
@@ -563,6 +569,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 			bufferManager.FreeBuffer(instruction.buffer);
 			return -1;		//Service doesn't exist
 		}
+		LeaveCriticalSection(&serviceListCriticalSection);
 
 		//Get the service entry
 		ConnectionServerService* service;
@@ -616,7 +623,9 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 		else {										//Specific location
 
 			//Look for specified destination
+			EnterCriticalSection(&service->socketListCriticalSection);
 			sockIter = sockList->find(instruction.socketContext);
+			LeaveCriticalSection(&service->socketListCriticalSection);
 
 			//Check if the specified destination was found
 			if (sockIter == sockList->end()) {
@@ -674,6 +683,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 
 		//PrintMessageFormatter(1, "InstructionType", "RECEIVE Instruction received.");
 
+		EnterCriticalSection(&serviceListCriticalSection);
 		iter = serviceList.find(instruction.destinationType);
 		if (iter == serviceList.end()) {
 
@@ -682,6 +692,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 			PrintMessageFormatter(2, "DST CODE", to_string(instruction.socketContext));
 			return -1;		//Service doesn't exist
 		}
+		LeaveCriticalSection(&serviceListCriticalSection);
 
 		//Get the service entry
 		service = &iter->second;
@@ -714,10 +725,12 @@ int RIOManager::NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped) {
 	CQ_Handler serviceCQs[2];
 
 	//Find the service entry
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find((*extendedOverlapped).serviceType);
 	if (iter == serviceList.end()) {
 		return NULL;		//Service doesn't exist
 	}
+	LeaveCriticalSection(&serviceListCriticalSection);
 
 	//Get the service entry
 	ConnectionServerService service;
@@ -767,7 +780,9 @@ void RIOManager::AssignConsoleCriticalSection(CRITICAL_SECTION critSec) {
 
 
 int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(extendedOverlapped->serviceType);
+	LeaveCriticalSection(&serviceListCriticalSection);
 	ConnectionServerService* connServ = &iter->second;
 
 	PrintMessageFormatter(1, "setsockopt", "Running SO_UPDATE_ACCEPT_CONTEXT on new connection.");
@@ -856,6 +871,7 @@ int RIOManager::ResetAcceptCall(EXTENDED_OVERLAPPED* extendedOverlapped) {
 	PrintMessageFormatter(3, "ResetAcceptCall", "Looking for Service #" + to_string(extendedOverlapped->serviceType));
 
 	//Find the service entry
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(extendedOverlapped->serviceType);
 	if (iter == serviceList.end()) {
 
@@ -863,6 +879,7 @@ int RIOManager::ResetAcceptCall(EXTENDED_OVERLAPPED* extendedOverlapped) {
 
 		return INVALID_SOCKET;		//Service doesn't exist
 	}
+	LeaveCriticalSection(&serviceListCriticalSection);
 
 	//Get the service entry
 	ConnectionServerService* service;
@@ -897,6 +914,7 @@ void RIOManager::PrintServiceInformation() {
 	int j = 1;
 
 	//iterate through all registered services
+	EnterCriticalSection(&serviceListCriticalSection);
 	for (auto it = serviceList.begin(); it != serviceList.end(); ++it) {
 		//Close the service's listening socket
 		connectionServerService = &it->second;
@@ -916,13 +934,16 @@ void RIOManager::PrintServiceInformation() {
 		
 		sockList = connectionServerService->socketList;
 		RQ_Handler rqHandler;
+		EnterCriticalSection(&connectionServerService->socketListCriticalSection);
 		//iterate through all sockets associated with the service
 		for (auto it = (*sockList).begin(); it != (*sockList).end(); ++it) {
 			PrintMessageFormatter(4, "Connect #" + to_string(j), to_string(it->first));
 			j++;
 		}
+		LeaveCriticalSection(&connectionServerService->socketListCriticalSection);
 		i++;
 	}
+	LeaveCriticalSection(&serviceListCriticalSection);
 }
 
 
@@ -936,10 +957,12 @@ void RIOManager::Shutdown() {
 
 	PrintMessageFormatter(0, "RIO MANAGER", "SHUTDOWN", "Initializing shutdown sequence. . .");
 
-
+	
 	CloseAllSockets();
 	CloseCQs();
 	CloseIOCPHandles();
+
+	DeleteCriticalSection(&serviceListCriticalSection);
 
 	bufferManager.ShutdownCleanup(rioFunctions);
 	
@@ -977,8 +1000,11 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService
 	service.isAddressRequired = false;
 
 	InitializeCriticalSectionAndSpinCount(&service.roundRobinCriticalSection, 4000);
+	InitializeCriticalSectionAndSpinCount(&service.socketListCriticalSection, 4000);
 
+	EnterCriticalSection(&serviceListCriticalSection);
 	serviceList.insert(std::pair<DWORD, ConnectionServerService>(typeCode, service));
+	LeaveCriticalSection(&serviceListCriticalSection);
 
 	return 0;
 
@@ -1007,10 +1033,12 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService
 
 int RIOManager::AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ, SOCKET socket, CRITICAL_SECTION criticalSection) {
 	//Find the service entry
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
 		return -1;		//Service doesn't exist
 	}
+	LeaveCriticalSection(&serviceListCriticalSection);
 
 //Get the service entry
 ConnectionServerService service;
@@ -1020,9 +1048,11 @@ service = iter->second;
 SocketList* socketList;
 socketList = service.socketList;
 
+EnterCriticalSection(&service.socketListCriticalSection);
 if ((*socketList).find(socketContext) != (*socketList).end()) {
 	return -2;		//Particular socket entry already exists
 }
+LeaveCriticalSection(&service.socketListCriticalSection);
 
 if (rioRQ == NULL || rioRQ == RIO_INVALID_RQ) {
 	return -3;		//Invalid RIO_RQ
@@ -1033,7 +1063,9 @@ RQ_Handler rqHandler;
 rqHandler.rio_RQ = rioRQ;
 rqHandler.socket = socket;
 rqHandler.criticalSection = criticalSection;
+EnterCriticalSection(&service.socketListCriticalSection);
 (*socketList).insert(std::pair<int, RQ_Handler>(socketContext, rqHandler));
+LeaveCriticalSection(&service.socketListCriticalSection);
 
 return 0;
 }
@@ -1042,6 +1074,7 @@ return 0;
 SOCKET RIOManager::GetListeningSocket(int typeCode) {
 
 	//Find the service entry
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
 
@@ -1049,6 +1082,7 @@ SOCKET RIOManager::GetListeningSocket(int typeCode) {
 
 		return INVALID_SOCKET;		//Service doesn't exist
 	}
+	LeaveCriticalSection(&serviceListCriticalSection);
 
 	//Get the service entry
 	ConnectionServerService service;
@@ -1068,6 +1102,7 @@ SOCKET RIOManager::GetListeningSocket(int typeCode) {
 int RIOManager::FillAcceptStructures(int typeCode, int numStruct) {
 
 	//Find the service entry
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
 
@@ -1075,6 +1110,7 @@ int RIOManager::FillAcceptStructures(int typeCode, int numStruct) {
 
 		return INVALID_SOCKET;		//Service doesn't exist
 	}
+	LeaveCriticalSection(&serviceListCriticalSection);
 
 	//Get the service entry
 	ConnectionServerService* service;
@@ -1162,8 +1198,10 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 	}
 
 	rioBuf->operationType = OP_RECEIVE;
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
+	LeaveCriticalSection(&serviceListCriticalSection);
 
 	rioBuf->srcType = (SrcDstType)serviceType;
 
@@ -1202,12 +1240,14 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 	}
 
 	rioBuf->operationType = OP_RECEIVE;
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
-	//
+	LeaveCriticalSection(&serviceListCriticalSection);
+	EnterCriticalSection(&connServ.socketListCriticalSection);
 	SocketList::iterator iterSL = connServ.socketList->find(destinationCode);
 	RQ_Handler rqHandler = iterSL->second;
-	//
+	LeaveCriticalSection(&connServ.socketListCriticalSection);
 	rioBuf->srcType = (SrcDstType)serviceType;
 	rioBuf->socketContext = destinationCode;
 
@@ -1289,6 +1329,7 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 	SOCKET* socket;
 
 	//Find the service entry
+	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
 
@@ -1296,11 +1337,13 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 
 		return -1;		//Service doesn't exist
 	}
+	LeaveCriticalSection(&serviceListCriticalSection);
 
 	connectionServerService = &iter->second;
 	sockList = connectionServerService->socketList;
 
 	//Find the specific entry
+	EnterCriticalSection(&connectionServerService->socketListCriticalSection);
 	SocketList::iterator sockIter = sockList->find(socketContext);
 	if (sockIter == sockList->end()) {
 
@@ -1308,6 +1351,7 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 
 		return -2;		//Service doesn't exist
 	}
+	LeaveCriticalSection(&connectionServerService->socketListCriticalSection);
 
 
 	PrintMessageFormatter(1, "Service #" + to_string(typeCode), "Closing connection with entry #" + to_string(socketContext));
@@ -1331,7 +1375,9 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 	}
 	LeaveCriticalSection(&connectionServerService->roundRobinCriticalSection);
 
+	EnterCriticalSection(&connectionServerService->socketListCriticalSection);
 	sockList->erase(socketContext);
+	LeaveCriticalSection(&connectionServerService->socketListCriticalSection);
 
 	return 0;
 }
@@ -1350,6 +1396,7 @@ void RIOManager::CloseAllSockets() {
 
 
 	//iterate through all registered services
+	EnterCriticalSection(&serviceListCriticalSection);
 	for (auto it = serviceList.begin(); it != serviceList.end(); ++it) {
 		//Close the service's listening socket
 		connectionServerService = &it->second;
@@ -1362,6 +1409,7 @@ void RIOManager::CloseAllSockets() {
 
 		sockList = (*connectionServerService).socketList;
 		//iterate through all sockets associated with the service
+		EnterCriticalSection(&connectionServerService->socketListCriticalSection);
 		for (auto it = (*sockList).begin(); it != (*sockList).end(); ++it) {
 
 
@@ -1374,11 +1422,14 @@ void RIOManager::CloseAllSockets() {
 			closesocket((*rqHandler).socket);
 			DeleteCriticalSection(&rqHandler->criticalSection);
 		}
+		LeaveCriticalSection(&connectionServerService->socketListCriticalSection);
 
+		DeleteCriticalSection(&connectionServerService->socketListCriticalSection);
 
 		i++;
 
 	}
+	LeaveCriticalSection(&serviceListCriticalSection);
 }
 
 ///This function prints a message to console with a specified format (two boxes).

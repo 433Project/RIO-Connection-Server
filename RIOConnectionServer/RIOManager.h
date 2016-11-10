@@ -27,6 +27,7 @@ struct ConnectionServerService {
 	SocketList* socketList;
 	SocketList::iterator roundRobinIterator;
 	CRITICAL_SECTION roundRobinCriticalSection;
+	CRITICAL_SECTION socketListCriticalSection;
 };
 
 typedef std::unordered_map<DWORD, ConnectionServerService> ServiceList;
@@ -43,6 +44,7 @@ class RIOManager
 	EXTENDED_OVERLAPPED mainExtendedOverlapped;
 
 	CRITICAL_SECTION consoleCriticalSection;
+	CRITICAL_SECTION serviceListCriticalSection;
 	
 	HandleList iocpList;		//Keep track of all IOCP queues for cleanup
 	SOCKET socketRIO;			//A dedicated socket in order to load extension functions
@@ -72,11 +74,6 @@ public:
 	int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ);							//TCP Client or Server with CQs specified
 	int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket);							//TCP Client or Server with CQs specified
 	int CreateRIOSocket(SocketType socketType, int serviceType, int port); //UDP Service with defaults or TCP listener with defaults
-																																					//int CreateRIOSocket(SocketType socketType, DWORD serviceType, int port, RIO_CQ receiveCQ, RIO_CQ sendCQ);				//UDP Socket with CQs specified
-	//int CreateRIOSocket(SocketType socketType, int port, HANDLE hIOCP);														//TCP Listener with IOCP queue specified
-	//int CreateRIOSocket(SocketType socketType, int port);																	//UDP Socket OR TCP Listener with default handles
-	//int CreateRIOSocket(SocketType socketType, DWORD serviceType);																				//Any Type with default values
-	//int CreateRIOSocket(SocketType socketType);																				//Any Type with default values
 
 	int SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sendCQ);
 	int SetServiceAddressSpecificity(int serviceType, bool isAddressRequired);
@@ -101,12 +98,12 @@ public:
 	void PrintBufferUsageStatistics();
 
 	void Shutdown();
+
 private:
 	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction);
 	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection);
 	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction);
 	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket);
-	//SocketList* GetService(DWORD typeCode);
 	int AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ, SOCKET socket, CRITICAL_SECTION criticalSection);
 	SOCKET GetListeningSocket(int typeCode);
 	int BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped, LPFN_ACCEPTEX acceptExFunction);
