@@ -42,28 +42,45 @@ enum SrcDstType
 
 enum Command
 {
-	MATCH_REQUEST = 0,
+	//Common
+	HEALTH_CHECK = 0,
+
+	//MS~MS
+	MATCH_REQUEST = 10,
 	MATCH_RESPONSE,
 	LATENCY,
-	HEALTH_CHECK,
-	MSLIST_REQUEST,
+
+	//MS~Config
+	MSLIST_REQUEST = 20,
 	MSLIST_RESPONSE,
-	PG_START,
-	PG_END,
-	ROOM_CREATE_REQUEST,
+
+	//Room~MS
+	ROOM_CREATE_REQUEST = 30,
 	ROOM_CREATE_RESPONSE,
-	ROOM_JOIN_REQUEST,
+
+	//Room~Client
+	ROOM_JOIN_REQUEST = 40,
 	ROOM_JOIN_RESPONSE,
 	GAME_START,
-	GAME_END,
+	GAME_END
 };
 
-enum Status
+enum Status : int
 {
-	SUCCESS = 0,
+	SUCCESS,
 	FAIL,
 	NONE
 };
+
+//Some stuff for flat buffer that's not needed in this program
+//table Body
+//{
+//cmd: Command;
+//status: Status;
+//data: string;
+//}
+//
+//root_type Body;
 
 
 struct Body
