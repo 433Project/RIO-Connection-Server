@@ -118,6 +118,10 @@ int _tmain(int argc, _TCHAR* argv[])
 						cout << "Numpad #3 Pressed. . . requesting buffer usage statistics. . ." << endl;
 						PostQueuedCompletionStatus(connectionServer.iocp, 0, CK_BUFINFO, &ov);
 						break;
+					case VK_NUMPAD4:
+						cout << "Numpad #4 Pressed. . . requesting critical section check. . ." << endl;
+						PostQueuedCompletionStatus(connectionServer.iocp, 0, CK_CHECKCRITSEC, &ov);
+						break;
 					default:
 						cout << "Some other key pressed" << endl;
 						break;
@@ -169,6 +173,10 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 
 		if (!GetQueuedCompletionStatus(connectionServer->iocp, &bytes, &key, (OVERLAPPED**)&op, INFINITE)) {
 			//ERROR
+			EnterCriticalSection(&consoleCriticalSection);
+			cout << "ERROR: Could not call GQCS. . ." << endl;
+			LeaveCriticalSection(&consoleCriticalSection);
+			break;
 		}
 
 		switch ((COMPLETION_KEY)key) {
@@ -257,6 +265,9 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 		case CK_BUFINFO:
 			connectionServer->rioManager.PrintBufferUsageStatistics();
 			break;
+		case CK_CHECKCRITSEC:
+			connectionServer->rioManager.CheckCriticalSections();
+			break;
 		default:
 			cout << "ERROR: Received erroneous message in IOCP queue" << endl;
 			break;
@@ -265,8 +276,6 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 		if (quitTrigger) {
 			break;
 		}
-
-
 	}
 
 

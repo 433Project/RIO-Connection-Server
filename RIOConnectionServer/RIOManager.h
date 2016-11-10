@@ -45,6 +45,7 @@ class RIOManager
 
 	CRITICAL_SECTION consoleCriticalSection;
 	CRITICAL_SECTION serviceListCriticalSection;
+	std::vector<CRITICAL_SECTION> criticalSectionDump;
 	
 	HandleList iocpList;		//Keep track of all IOCP queues for cleanup
 	SOCKET socketRIO;			//A dedicated socket in order to load extension functions
@@ -94,6 +95,7 @@ public:
 	void AssignConsoleCriticalSection(CRITICAL_SECTION critSec);
 	//
 
+	void CheckCriticalSections();
 	void PrintServiceInformation();
 	void PrintBufferUsageStatistics();
 
