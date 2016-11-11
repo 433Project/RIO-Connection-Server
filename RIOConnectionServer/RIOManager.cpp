@@ -628,20 +628,22 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 			//NOTE - We already checked if sockList is empty above
 			//NOTE - When a sockList entry is closed, the iterator position is changed
 
-			sockIter = sockList->begin();
-
-			//EnterCriticalSection(&service->roundRobinCriticalSection);
-			//if (service->roundRobinIterator == sockList->end()) {
-			//	service->roundRobinIterator = sockList->begin();
-			//}
-			//sockIter = service->roundRobinIterator;
-			//service->roundRobinIterator++;
-			//if (service->roundRobinIterator == sockList->end()) {
-			//	service->roundRobinIterator = sockList->begin();
-			//}
-			////sockIter = sockList->begin();
-			//LeaveCriticalSection(&service->roundRobinCriticalSection);
-
+			EnterCriticalSection(&service->socketListCriticalSection);
+			SocketList::iterator robinIter = sockList->find(service->roundRobinLocation);
+			LeaveCriticalSection(&service->socketListCriticalSection);
+			if (robinIter == sockList->end()) {	//Doesn't contain stored location
+				sockIter = sockList->begin();
+			}
+			else {								//Has stored location, need to assign and then switch to next location
+				sockIter = robinIter;
+				robinIter++;					//Goto next element
+				if (robinIter == sockList->end()) {
+					robinIter = sockList->begin();
+				}
+				EnterCriticalSection(&service->roundRobinCriticalSection);
+				service->roundRobinLocation = robinIter->first;
+				LeaveCriticalSection(&service->roundRobinCriticalSection);
+			}
 
 			/*EnterCriticalSection(&consoleCriticalSection);
 			cout << "Round-Robin Send to SOCKETCOTEXT: " << sockIter->first << endl;
@@ -670,14 +672,21 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 					return -3;		//Specified location not found, round-robin not allowed
 				}
 
-				EnterCriticalSection(&service->roundRobinCriticalSection);
-				if (service->roundRobinIterator == sockList->end()) {
-					service->roundRobinIterator = sockList->begin();
+				EnterCriticalSection(&service->socketListCriticalSection);
+				SocketList::iterator robinIter = sockList->find(service->roundRobinLocation);
+				LeaveCriticalSection(&service->socketListCriticalSection);
+				if (robinIter == sockList->end()) {	//Doesn't contain stored location
+					sockIter = sockList->begin();
 				}
-				sockIter = service->roundRobinIterator;
-				service->roundRobinIterator++;
-				if (service->roundRobinIterator == sockList->end()) {
-					service->roundRobinIterator = sockList->begin();
+				else {								//Has stored location, need to assign and then switch to next location
+					sockIter = robinIter;
+					robinIter++;					//Goto next element
+					if (robinIter == sockList->end()) {
+						robinIter = sockList->begin();
+					}
+					EnterCriticalSection(&service->roundRobinCriticalSection);
+					service->roundRobinLocation = robinIter->first;
+					LeaveCriticalSection(&service->roundRobinCriticalSection);
 				}
 				//sockIter = sockList->begin();
 				LeaveCriticalSection(&service->roundRobinCriticalSection);
@@ -787,18 +796,6 @@ int RIOManager::NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped) {
 
 	return 0;
 }
-
-
-
-RIO_BUFFERID RIOManager::RegBuf(char* buffer, DWORD length) {
-	return rioFunctions.RIORegisterBuffer(buffer, length);
-}
-
-void RIOManager::DeRegBuf(RIO_BUFFERID riobuf) {
-	rioFunctions.RIODeregisterBuffer(riobuf);
-	return;
-}
-
 
 int RIOManager::RIONotifyIOCP(RIO_CQ rioCQ) {
 	return rioFunctions.RIONotify(rioCQ);
@@ -1037,12 +1034,12 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService
 	service.receiveCQ = mainRIOCQ;
 	service.sendCQ = mainRIOCQ;
 	service.socketList = new SocketList();
-	service.roundRobinIterator = service.socketList->begin();
 	service.udpRQ = udpRQ;
 	service.udpCriticalSection = udpCriticalSection;
 	service.acceptExFunction = acceptExFunction;
 	service.isUDPService = isUDPService;
 	service.isAddressRequired = false;
+	service.roundRobinLocation = 0;
 
 	InitializeCriticalSectionAndSpinCount(&service.roundRobinCriticalSection, 4000);
 	InitializeCriticalSectionAndSpinCount(&service.socketListCriticalSection, 4000);
@@ -1103,6 +1100,13 @@ int RIOManager::AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ,
 
 	if (rioRQ == NULL || rioRQ == RIO_INVALID_RQ) {
 		return -3;		//Invalid RIO_RQ
+	}
+
+	//Update the round-robin location if this is the first service
+	if (service.roundRobinLocation == 0) {
+		EnterCriticalSection(&service.roundRobinCriticalSection);
+		service.roundRobinLocation = socketContext;
+		LeaveCriticalSection(&service.roundRobinCriticalSection);
 	}
 
 	//Add the socket context/ RQ pair into the service
@@ -1427,29 +1431,6 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 
 	//Cannot delete the critical section because other threads my still be processing the critical section
 	criticalSectionDump.push_back(rqHandler->criticalSection);
-
-	//Be sure that the round-robin iterator is moved if this entry was currently pointed to
-	//If it is pointed to the end, we are fine, but if it isn't then we increment the iterator
-	//Then if we land on the end we be sure to move the iterator back to the beginning
-	EnterCriticalSection(&connectionServerService->roundRobinCriticalSection);
-	connectionServerService->roundRobinIterator = sockList->begin();
-
-	/*if (connectionServerService->socketList->empty()) {
-		connectionServerService->roundRobinIterator = sockList->begin();
-	}
-	else {
-		if (!(connectionServerService->roundRobinIterator == sockList->end())) {
-			if (connectionServerService->roundRobinIterator->first == socketContext) {
-				connectionServerService->roundRobinIterator++;
-				if (connectionServerService->roundRobinIterator == sockList->end()) {
-					connectionServerService->roundRobinIterator = sockList->begin();
-				}
-			}
-		}
-	}*/
-
-	LeaveCriticalSection(&connectionServerService->roundRobinCriticalSection);
-
 
 	EnterCriticalSection(&connectionServerService->socketListCriticalSection);
 	sockList->erase(socketContext);

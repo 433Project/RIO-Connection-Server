@@ -14,20 +14,29 @@ typedef deque<EXTENDED_OVERLAPPED> AcceptStructs;
 typedef std::unordered_map<int, RQ_Handler> SocketList;
 
 struct ConnectionServerService {
-	bool isUDPService;
-	bool isAddressRequired;
+	//Main components
 	int port;
-	SOCKET listeningSocket;
 	CQ_Handler receiveCQ;
 	CQ_Handler sendCQ;
-	RIO_RQ udpRQ;
-	CRITICAL_SECTION udpCriticalSection;
+	bool isUDPService;
+
+	//Listening and connection accepts
+	SOCKET listeningSocket;
 	LPFN_ACCEPTEX acceptExFunction;
 	AcceptStructs acceptStructs;
+
+	//Connections
+	CRITICAL_SECTION socketListCriticalSection;			//Critical Section for modifying the socket list hash
 	SocketList* socketList;
-	SocketList::iterator roundRobinIterator;
-	CRITICAL_SECTION roundRobinCriticalSection;
-	CRITICAL_SECTION socketListCriticalSection;
+
+	//UDP Specific
+	CRITICAL_SECTION udpCriticalSection;				//Critical Section for using the UDP RQ
+	RIO_RQ udpRQ;
+
+	//Round-Robin Service
+	bool isAddressRequired;
+	CRITICAL_SECTION roundRobinCriticalSection;			//Critical Section for modifying roundRobinLocation
+	int roundRobinLocation;
 };
 
 typedef std::unordered_map<DWORD, ConnectionServerService> ServiceList;
@@ -89,8 +98,6 @@ public:
 	int NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped);
 
 	//TEMPS
-	RIO_BUFFERID RegBuf(char* buffer, DWORD length);
-	void DeRegBuf(RIO_BUFFERID riobuf);
 	int RIONotifyIOCP(RIO_CQ  rioCQ);
 	void AssignConsoleCriticalSection(CRITICAL_SECTION critSec);
 	//
