@@ -131,4 +131,27 @@ struct Instruction {
 	EXTENDED_RIO_BUF* buffer;
 };
 
+struct RIOMainConfig {
+	int bufferSize;
+	int dequeueCount;
+	int numThreads;
+	int spinCount;
+};
+
+struct ServiceData {
+	SocketType serviceType;
+	int serviceCode;
+	int servicePort;
+	int serviceMaxClients;
+	int serviceMaxAccepts;
+	int serviceRQMaxReceives;
+	int serviceRQMaxSends;
+
+	ServiceData(SocketType servType, int code, int port) {
+		serviceType = servType;
+		serviceCode = code;
+		servicePort = port;
+	}
+};
+
 

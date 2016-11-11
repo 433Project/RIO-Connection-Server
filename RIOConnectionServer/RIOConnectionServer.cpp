@@ -16,23 +16,12 @@ struct BasicConnectionServerHandles {
 	CQ_Handler cqHandler;
 };
 
-struct ServiceData {
-	SocketType serviceType;
-	int serviceCode;
-	int servicePort;
 
-	ServiceData(SocketType servType, int code, int port) {
-		serviceType = servType;
-		serviceCode = code;
-		servicePort = port;
-	}
-};
 
 void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	RIOManager rioManager;
 	std::vector<std::thread*> threadPool;
 	std::vector<ServiceData> services;
 

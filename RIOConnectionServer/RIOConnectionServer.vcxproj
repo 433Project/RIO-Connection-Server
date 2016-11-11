@@ -146,6 +146,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BufferManager.h" />
+    <ClInclude Include="ConfigurationManager.h" />
     <ClInclude Include="definitions.h" />
     <ClInclude Include="ProcessManager.h" />
     <ClInclude Include="RIOManager.h" />
@@ -154,6 +155,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BufferManager.cpp" />
+    <ClCompile Include="ConfigurationManager.cpp" />
     <ClCompile Include="ProcessManager.cpp" />
     <ClCompile Include="RIOConnectionServer.cpp" />
     <ClCompile Include="RIOManager.cpp" />
