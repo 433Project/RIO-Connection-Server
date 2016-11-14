@@ -23,35 +23,56 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+	//##########################################
+	//				Setup/Config
+	//##########################################
+	cout << "* * * * * * * * * * * * * * * * * * * * * * * * * * * *" << endl;
+	cout << "* * * * * 433 Project - RIO-Connection-Server * * * * *" << endl;
+	cout << "* * * * * * * * * * * * * * * * * * * * * * * * * * * *" << endl;
+
+	string configFileLocation = "C:\\RIOConfig\\config.txt";
+
+	cout << "\nReading configuration data from: " << configFileLocation << endl;
+
 	std::vector<std::thread*> threadPool;
 	std::vector<ServiceData> services;
 	RIOMainConfig rioMainConfig;
-
-	//***SETUP***
-
 	ConfigurationManager* configManager = new ConfigurationManager();
 
-	configManager->LoadConfiguration("C:\\RIOConfig\\config.txt");
+	//Load configuration from file
+	configManager->LoadConfiguration(configFileLocation);
 	rioMainConfig = configManager->GetRIOConfiguration();
 	services = configManager->GetServiceConfiguration();
 
 	BasicConnectionServerHandles connectionServer;
 
-	InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, 4000);//
-	connectionServer.rioManager.AssignConsoleCriticalSection(consoleCriticalSection);//
+	//For error message console printing, we are creating a critical section to prevent multi-threads
+	//from printing at the same time
+	InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, rioMainConfig.spinCount);
+	connectionServer.rioManager.AssignConsoleCriticalSection(consoleCriticalSection);
 
-	connectionServer.rioManager.InitializeRIO();
+	//Calculate the number of buffers required to handle all services and the maximum CQ size
+	DWORD numberBuffersRequired = 0;
+	int maximumCQSize = 0;
+	for each (auto serviceData in services)
+	{
+		numberBuffersRequired = numberBuffersRequired +
+				(serviceData.serviceMaxClients * 
+				(serviceData.serviceRQMaxReceives + serviceData.serviceRQMaxSends));
+	}
+	maximumCQSize = (int)min(numberBuffersRequired, (DWORD)RIO_MAX_CQ_SIZE);
+	cout << "\nRequired number of buffers: \t" << numberBuffersRequired << endl;
+	cout << "Maximum CQ size: \t\t" << maximumCQSize << endl;
+
+	//Initialize the RIO Manager and create our IOCP and CQ
+	connectionServer.rioManager.InitializeRIO(rioMainConfig.bufferSize, 
+				numberBuffersRequired, 
+				rioMainConfig.spinCount);
 	connectionServer.iocp = connectionServer.rioManager.CreateIOCP();
-	CQ_Handler cqHandler = connectionServer.rioManager.CreateCQ();
-
+	CQ_Handler cqHandler = connectionServer.rioManager.CreateCQ(maximumCQSize);
 	connectionServer.cqHandler = cqHandler;
 
-
-
-
-	//Load Services
-
-
+	//Initialize all our services
 	//enum DestinationType
 	//{
 	//	MATCHING_SERVER = 0,		8433
@@ -60,29 +81,31 @@ int _tmain(int argc, _TCHAR* argv[])
 	//	PACKET_GENERATOR = 3,		5050 (UDP)
 	//	MONITORING_SERVER = 4		11433
 	//};
-
-	/*services.push_back(*(new ServiceData(TCPListener, 0, 8433)));
-	services.push_back(*(new ServiceData(TCPListener, 1, 10433)));
-	services.push_back(*(new ServiceData(TCPListener, 2, 9433)));
-	services.push_back(*(new ServiceData(UDPSocket, 3, 5050)));
-	services.push_back(*(new ServiceData(TCPListener, 4, 11433)));*/
-
-	//Create basic UDPSocket at Port 5050
-	//connectionServer.rioManager.CreateRIOSocket(UDPSocket, 1, 5050);
-	//connectionServer.rioManager.CreateRIOSocket(TCPListener, 2, 10433);
 	for each (auto serviceData in services)
 	{	
-		connectionServer.rioManager.CreateRIOSocket(serviceData.serviceType, serviceData.serviceCode, serviceData.servicePort);
+		connectionServer.rioManager.CreateRIOSocket(
+			serviceData.serviceType, 
+			serviceData.serviceCode, 
+			serviceData.servicePort,
+			serviceData.serviceMaxClients,		//
+			serviceData.serviceMaxAccepts,
+			serviceData.serviceRQMaxReceives,
+			serviceData.serviceRQMaxSends,
+			serviceData.isAddressRequired);
 	}
 
-	//Start threads and keep track of them
+	//##########################################
+	//			Create IOCP Threads
+	//##########################################
 	for (int i = 0; i < rioMainConfig.numThreads; i++)
 	{
 		std::thread* thread = new std::thread(MainProcess, &connectionServer, i);
 		threadPool.emplace_back(thread);
 	}
 
-	//Loop and wait for a command to be sent to the main IOCP
+	//##########################################
+	//		Wait for Commands from User
+	//##########################################
 	{
 		bool isRunning = true;
 		DWORD mode, inputCount;

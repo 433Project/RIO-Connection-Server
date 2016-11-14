@@ -14,9 +14,10 @@ int RIOManager::SetConfiguration(_TCHAR* config[]) {
 }
 
 ///This function loads WinSock and initiates the RIOManager basic needs such as registered buffers.
-int RIOManager::InitializeRIO()
+int RIOManager::InitializeRIO(int bufferSize, DWORD bufferCount, int spinCount)
 {
-	InitializeCriticalSectionAndSpinCount(&serviceListCriticalSection, 4000);
+	rioSpinCount = spinCount;
+	InitializeCriticalSectionAndSpinCount(&serviceListCriticalSection, spinCount);
 
 	// 1. Initialize WinSock
 	WSADATA wsaData;
@@ -25,9 +26,7 @@ int RIOManager::InitializeRIO()
 
 
 	if (0 != ::WSAStartup(0x202, &wsaData)) {
-
 		PrintMessageFormatter(1, "ERROR", "WinSock Initialization Failed.");
-
 		return -1;
 	}
 
@@ -40,10 +39,8 @@ int RIOManager::InitializeRIO()
 
 	socketRIO = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_REGISTERED_IO);
 	if (socketRIO == INVALID_SOCKET) {
-
 		PrintMessageFormatter(1, "ERROR", "WSASocket failed to generate socket.");
 		PrintWindowsErrorMessage();
-
 		return -2;
 	}
 
@@ -58,9 +55,7 @@ int RIOManager::InitializeRIO()
 		NULL,
 		NULL))
 	{
-
 		PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to retrieve RIO extension functions.");
-
 		return -3;
 	}
 
@@ -75,24 +70,18 @@ int RIOManager::InitializeRIO()
 		NULL,
 		NULL))
 	{
-
 		PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to retrieve Accept EX.");
-
 		return -4;
 	}
 
-
 	PrintMessageFormatter(1, "SUCCESS", " ");
 
-
 	// 3. **Initialize Buffer Manager**//
-
 	PrintMessageFormatter(1, "InitializeRIO", "3. Initializing Buffer Mananger. . .");
 
 
 	//**Initialize Buffer Manager**//
-	bufferManager.Initialize(rioFunctions, 500000, 100);
-
+	bufferManager.Initialize(rioFunctions, bufferCount, bufferSize);
 
 	PrintMessageFormatter(1, "COMPLETE", " ");
 
@@ -108,27 +97,21 @@ HANDLE RIOManager::CreateIOCP() {
 		//ReportError("CreateIoComplectionPort - Create", true);
 	}
 
-
 	PrintMessageFormatter(0, "RIO MANAGER", "CreateIOCP", "Creating IOCP Handle. . .");
-
 
 	//**Register New IOCP with RIO Manager**//
 	iocpList.push_back(hIOCP);
 
-
 	int length = iocpList.size();
 	PrintMessageFormatter(1, "SUCCESS", "Created and Added IOCP #" + to_string(length));
 
-
-
 	PrintMessageFormatter(1, "COMPLETE", " ");
-
 
 	return hIOCP;
 }
 
 ///This function creates a new RIO Completion Queue with IOCP Queue and Completion Key specified (For Multi-CQ systems with multi-IOCP)
-CQ_Handler RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
+CQ_Handler RIOManager::CreateCQ(int size, HANDLE hIOCP, COMPLETION_KEY completionKey) {
 	CQ_Handler cqHandler;
 	OVERLAPPED overlapped;
 	RIO_NOTIFICATION_COMPLETION rioNotificationCompletion;
@@ -143,7 +126,7 @@ CQ_Handler RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
 	rioNotificationCompletion.Iocp.Overlapped = &overlapped;
 
 	cqHandler.rio_CQ = rioFunctions.RIOCreateCompletionQueue(
-		500000,	//MAX_PENDING_RECEIVES + MAX_PENDING_SENDS
+		size,	//MAX_PENDING_RECEIVES + MAX_PENDING_SENDS
 		&rioNotificationCompletion);
 	if (cqHandler.rio_CQ == RIO_INVALID_CQ) {
 
@@ -152,7 +135,7 @@ CQ_Handler RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
 		return cqHandler;
 	}
 
-	InitializeCriticalSectionAndSpinCount(&cqHandler.criticalSection, 4000); //Add Spin Count Parameter here
+	InitializeCriticalSectionAndSpinCount(&cqHandler.criticalSection, rioSpinCount); //Add Spin Count Parameter here
 
 	//*** Need to Store this RIO_CQ handle/Critical Section into the RIO Manager Instance ***
 	rioCQList.push_back(cqHandler);
@@ -170,22 +153,28 @@ CQ_Handler RIOManager::CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey) {
 }
 
 ///This function creates a new RIO Completion Queue with default IOCP Queue but custom Completion Key (For creating Multi-CQ system with one IOCP)
-CQ_Handler RIOManager::CreateCQ(COMPLETION_KEY completionKey) {
-	return CreateCQ(GetMainIOCP(), completionKey);
+CQ_Handler RIOManager::CreateCQ(int size, COMPLETION_KEY completionKey) {
+	return CreateCQ(size, GetMainIOCP(), completionKey);
 }
 
 ///This function creates a new RIO Completion Queue with IOCP Queue specified (For creating main-CQ in Multi-IOCP system)
-CQ_Handler RIOManager::CreateCQ(HANDLE hIOCP) {
-	return CreateCQ(hIOCP, CK_RIO);
+CQ_Handler RIOManager::CreateCQ(int size, HANDLE hIOCP) {
+	return CreateCQ(size, hIOCP, CK_RIO);
 }
 
 ///This function creates a new RIO Completion Queue with default values (For creating main-CQ for main-IOCP queue)
-CQ_Handler RIOManager::CreateCQ() {
-	return CreateCQ(GetMainIOCP());
+CQ_Handler RIOManager::CreateCQ(int size) {
+	return CreateCQ(size, GetMainIOCP());
 }
 
 ///This function creates a new RIO Socket of various types
-int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP) {
+int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP,
+	int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired) {
+
+	// ##################################
+	//			Create Socket
+	// ##################################
+
 	sockaddr_in socketAddress;
 	socketAddress.sin_family = AF_INET;
 	socketAddress.sin_port = htons(port);
@@ -199,9 +188,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 	RIO_RQ rio_RQ;
 	int option = TRUE;
 
-
 	PrintMessageFormatter(0, "RIO MANAGER", "CreateRIOSocket", "Creating new RIO Socket. . .");
-
 
 	switch (socketType) {
 		//Non-accepted Socket Cases
@@ -242,32 +229,34 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		break;
 
 	default:
-
 		PrintMessageFormatter(1, "ERROR", "Invalid Socket Type.");
-
 		return -1; //Incorrect socket Type
 	}
 
-	if (newSocket == INVALID_SOCKET) {
 
+	if (newSocket == INVALID_SOCKET) {
 		PrintMessageFormatter(1, "ERROR", "WSASocket failed to generate socket.");
 		PrintWindowsErrorMessage();
-
 		return -2;
 	}
 
+	// ##################################
+	//				Bind
+	// ##################################
+
 	if (requiresBind) {
-
 		if (SOCKET_ERROR == ::bind(newSocket, reinterpret_cast<struct sockaddr *>(&socketAddress), sizeof(socketAddress))) {
-
 			PrintMessageFormatter(1, "ERROR", "Bind failed.");
 			PrintWindowsErrorMessage();
-
 			return -3;
 		}
 	}
 
-	if (isListener) {			//******Listeners******
+	// ##################################
+	//				Listen
+	// ##################################
+
+	if (isListener) {			//******TCP Listeners******
 
 		if (NULL != WSAIoctl(
 			newSocket,
@@ -282,16 +271,12 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		{
 			PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to load extensions.");
 			PrintWindowsErrorMessage();
-
 			return -4;
 		}
 
-
 		if (SOCKET_ERROR == listen(newSocket, 100)) {	//MAX_LISTEN_BACKLOG_SERVER
-
 			PrintMessageFormatter(1, "ERROR", "Listen failed.");
 			PrintWindowsErrorMessage();
-
 			return -5;
 		}
 
@@ -301,23 +286,18 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 			(ULONG_PTR)CK_ACCEPT,			//////////
 			0);								//MAX_CONCURRENT_THREADS
 		if (NULL == hIOCP) {
-
 			PrintMessageFormatter(1, "ERROR", "New socket could not be added to IOCP queue.");
 			PrintWindowsErrorMessage();
-
 			return -6;
 		}
 
 		//Create a new service to represent this new listening socket
-		if (CreateNewService(serviceType, port, false, newSocket, acceptExFunction) < 0) {
-
+		if (CreateNewService(serviceType, port, serviceMaxClients, isAddressRequired, false, newSocket, acceptExFunction) < 0) {
 			PrintMessageFormatter(1, "ERROR", "Could not register new service.");
-
 			return -8;
 		}
 		//Post-Initial accepts???
-		FillAcceptStructures(serviceType, 1);
-
+		FillAcceptStructures(serviceType, serviceMaxAccepts);
 	}
 
 	else {		//********Non-Listeners******
@@ -333,86 +313,85 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 			NULL,
 			NULL))
 		{
-
 			PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to load extensions.");
 			PrintWindowsErrorMessage();
-
 			return -4;
 		}
 
 		//Create Critical Section
 		CRITICAL_SECTION criticalSection;
-		InitializeCriticalSectionAndSpinCount(&criticalSection, 4000); //Add Spin Count Parameter here
+		InitializeCriticalSectionAndSpinCount(&criticalSection, rioSpinCount); //Add Spin Count Parameter here
 
 		int socketContext = (int)newSocket;
 
 		rio_RQ = rioFunctions.RIOCreateRequestQueue(
-			newSocket, 10000, 1,				//MAX_PENDING_RECEIVES_UDP, MAX_PENDING_SENDS_UDP
-			10000, 1, receiveCQ.rio_CQ,
+			newSocket, serviceRQMaxReceives, 1,				//MAX_PENDING_RECEIVES_UDP, MAX_PENDING_SENDS_UDP
+			serviceRQMaxSends, 1, receiveCQ.rio_CQ,
 			sendCQ.rio_CQ, &socketContext);		//Need to define socket context!!!
 		if (rio_RQ == RIO_INVALID_RQ) {
-
 			PrintMessageFormatter(1, "ERROR", "Failed to generate RIO RQ.");
 			PrintWindowsErrorMessage();
-
 			return -7;
 		}
 
 		//Add a socket to a service and Post Initial Receives
 		if (socketType == UDPSocket) {
-
-			if (CreateNewService(serviceType, port, true, newSocket, rio_RQ, criticalSection) < 0) {
-
+			if (CreateNewService(serviceType, port, 0, false, true, newSocket, rio_RQ, criticalSection) < 0) {
 				PrintMessageFormatter(1, "ERROR", "Could not register new service.");
-
 				return -8;
 			}
-
-			for (int y = 0; y < 10000; y++) {
+			for (int y = 0; y < serviceRQMaxReceives; y++) {
 				if (!PostReceiveOnUDPService(serviceType)) {
 					PrintMessageFormatter(2, "ERROR", "Failed to Post Receive on new UDP service.");
 					PrintWindowsErrorMessage();
-
 				}
 			}
 		}
 		else {
-
 			if (AddEntryToService(serviceType, socketContext, rio_RQ, newSocket, criticalSection) < 0) {
-
 				PrintMessageFormatter(1, "ERROR", "Could add entry to service.");
-
 				return -9;
 			}
-
-			for (int y = 0; y < 10000; y++) {
+			for (int y = 0; y < serviceRQMaxReceives; y++) {
 				if (!PostReceiveOnTCPService(serviceType, (int)newSocket)) {
-
 					PrintMessageFormatter(2, "ERROR", "Failed to Post Receive on new TCP entry.");
 					PrintWindowsErrorMessage();
-
 				}
 			}
 		}
 	}
 
-
 	PrintMessageFormatter(1, "COMPLETE", " ");
-
 
 	return 0;
 }
 
+//int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP) {
+//	return CreateRIOSocket(socketType, serviceType, newSocket, 0, receiveCQ, sendCQ, GetMainIOCP(),
+//			10000, 10, 10000, 10000, false);
+//}
+//
 int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET relevantSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ) {
-	return CreateRIOSocket(socketType, serviceType, relevantSocket, 0, receiveCQ, sendCQ, GetMainIOCP());
+	return CreateRIOSocket(socketType, serviceType, relevantSocket, 0, receiveCQ, sendCQ, GetMainIOCP(),
+		0, 0, 0, 0, false);
+}
+//
+//int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket) {
+//	return CreateRIOSocket(socketType, serviceType, 0, newSocket, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP());
+//}
+
+int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port,
+	int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired) {
+	SOCKET socket = INVALID_SOCKET;
+	return CreateRIOSocket(socketType, serviceType, port, socket, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP(),
+		serviceMaxClients, serviceMaxAccepts, serviceRQMaxReceives, serviceRQMaxSends, isAddressRequired);
 }
 
-int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket) {
-	return CreateRIOSocket(socketType, serviceType, 0, newSocket, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP());
-}
+
 int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port) {
 	SOCKET socket = INVALID_SOCKET;
-	return CreateRIOSocket(socketType, serviceType, port, socket, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP());
+	return CreateRIOSocket(socketType, serviceType, port, socket, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP(),
+		0, 0, 0, 0, false);
 }
 
 ///This function allows one to customize the receive/send CQ of a particular service.
@@ -805,8 +784,6 @@ void RIOManager::AssignConsoleCriticalSection(CRITICAL_SECTION critSec) {
 	consoleCriticalSection = critSec;
 }
 
-
-
 int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
 	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(extendedOverlapped->serviceType);
@@ -819,10 +796,8 @@ int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
 				SOL_SOCKET, 
 				SO_UPDATE_ACCEPT_CONTEXT, 
 				(char*) &connServ->listeningSocket, sizeof(connServ->listeningSocket))) {
-
 		PrintMessageFormatter(1, "ERROR", "setsockopt(SO_UPDATE_ACCEPT_CONTEXT) failed.");
 		PrintWindowsErrorMessage();
-
 		return -1;
 	}
 
@@ -842,9 +817,7 @@ int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
 		NULL,
 		NULL))
 	{
-
 		PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to retrieve GetAcceptExSockaddrs.");
-
 		return -2;
 	}
 
@@ -1022,7 +995,7 @@ void RIOManager::Shutdown() {
 
 ///This function creates a new service in the RIO Manager service list.
 ///Note that the receive and send CQs are set to the default value.
-int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction) {
 	if (serviceList.find(typeCode) != serviceList.end()) {
 		return -1;		//Service already exists
 	}
@@ -1038,11 +1011,12 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService
 	service.udpCriticalSection = udpCriticalSection;
 	service.acceptExFunction = acceptExFunction;
 	service.isUDPService = isUDPService;
-	service.isAddressRequired = false;
+	service.isAddressRequired = isAddressRequired;
 	service.roundRobinLocation = 0;
+	service.maxClients = maxClients;
 
-	InitializeCriticalSectionAndSpinCount(&service.roundRobinCriticalSection, 4000);
-	InitializeCriticalSectionAndSpinCount(&service.socketListCriticalSection, 4000);
+	InitializeCriticalSectionAndSpinCount(&service.roundRobinCriticalSection, rioSpinCount);
+	InitializeCriticalSectionAndSpinCount(&service.socketListCriticalSection, rioSpinCount);
 
 	EnterCriticalSection(&serviceListCriticalSection);
 	serviceList.insert(std::pair<DWORD, ConnectionServerService>(typeCode, service));
@@ -1052,23 +1026,27 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService
 
 }
 
-int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection) {
-	return CreateNewService(typeCode, portNumber, isUDPService, listeningSocket, udpRQ, udpCriticalSection, nullptr);
+//int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction) {
+//	return CreateNewService(typeCode, portNumber, maxClients, isAddressRequired, isUDPService, listeningSocket, udpRQ, udpCriticalSection, nullptr);
+//}
+
+int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection) {
+	return CreateNewService(typeCode, portNumber, maxClients, isAddressRequired, isUDPService, listeningSocket, udpRQ, udpCriticalSection, nullptr);
 }
 
-int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction) {
 	CRITICAL_SECTION emptyCriticalSection;
-	InitializeCriticalSectionAndSpinCount(&emptyCriticalSection, 4000);
-	return CreateNewService(typeCode, portNumber, isUDPService, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, acceptExFunction);
+	InitializeCriticalSectionAndSpinCount(&emptyCriticalSection, rioSpinCount);
+	return CreateNewService(typeCode, portNumber, maxClients, isAddressRequired, isUDPService, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, acceptExFunction);
 }
 
 
 ///This function creates a new service in the RIO Manager service list.
 ///Note that the receive and send CQs are set to the default value.
-int RIOManager::CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket) {
 	CRITICAL_SECTION emptyCriticalSection;
-	InitializeCriticalSectionAndSpinCount(&emptyCriticalSection, 4000);
-	return CreateNewService(typeCode, portNumber, isUDPService, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, nullptr);
+	InitializeCriticalSectionAndSpinCount(&emptyCriticalSection, rioSpinCount);
+	return CreateNewService(typeCode, portNumber, maxClients, isAddressRequired, isUDPService, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, nullptr);
 }
 
 
@@ -1573,31 +1551,5 @@ void RIOManager::PrintWindowsErrorMessage() {
 
 RIOManager::~RIOManager()
 {
-	//delete &bufferManager;
+	
 }
-
-/*
-//***Global Variables***
-RIO_EXTENSION_FUNCTION_TABLE g_RIO_UDP, g_RIO_TCPClient, g_RIO_TCPServer;
-LPFN_ACCEPTEX g_AcceptExClient, g_AcceptExServer;
-SOCKET g_SocketUDP, g_SocketTCPClient, g_SocketTCPServer;
-DWORD g_PortUDP, g_PortTCPClient, g_PortTCPServer;
-HANDLE g_hIOCP = 0;
-RIO_CQ g_RIOCQ = 0;
-RIO_RQ g_RIORQ_UDP = 0;
-
-CRITICAL_SECTION g_CriticalSection;
-DWORD g_SpinCount;
-DWORD MAX_CONCURRENT_THREADS = 4;
-DWORD MAX_PENDING_RECEIVES = 10000;
-DWORD MAX_PENDING_SENDS = 1000;
-DWORD MAX_PENDING_RECEIVES_UDP = 10000;
-DWORD MAX_PENDING_SENDS_UDP = 1000;
-DWORD MAX_PENDING_RECEIVES_TCPServer = 10000;
-DWORD MAX_PENDING_SENDS_TCPServer = 1000;
-DWORD MAX_CLIENTS = 10000000;
-DWORD MAX_SERVERS = 100;
-DWORD MAX_LISTEN_BACKLOG_CLIENT = 10000;
-DWORD MAX_LISTEN_BACKLOG_SERVER = 20;
-
-*/

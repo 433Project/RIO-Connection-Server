@@ -146,6 +146,7 @@ struct ServiceData {
 	int serviceMaxAccepts;
 	int serviceRQMaxReceives;
 	int serviceRQMaxSends;
+	bool isAddressRequired;
 
 	ServiceData() {
 

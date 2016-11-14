@@ -16,6 +16,7 @@ typedef std::unordered_map<int, RQ_Handler> SocketList;
 struct ConnectionServerService {
 	//Main components
 	int port;
+	int maxClients;
 	CQ_Handler receiveCQ;
 	CQ_Handler sendCQ;
 	bool isUDPService;
@@ -62,6 +63,7 @@ class RIOManager
 	GUID rioFunctionTableID = WSAID_MULTIPLE_RIO;
 	GUID acceptExID = WSAID_ACCEPTEX;
 	DWORD dwBytes = 0;
+	int rioSpinCount = 4000;	//Default spincount of 4000
 
 	//Data Structures for Managing Servers/Clients
 	ServiceList serviceList;	//Keeps track of all generated services
@@ -69,20 +71,24 @@ class RIOManager
 public:
 	RIOManager();
 	~RIOManager();
-	int SetConfiguration(_TCHAR* config[]);		//Assigns configuration variables for the RIO_M instance
-	int InitializeRIO();						//Starts WinSock, Creates Buffer Manger and Registers Buffers
-	HANDLE CreateIOCP();						//Creates a new IOCP for the RIO_M instance
+	int SetConfiguration(_TCHAR* config[]);									//Assigns configuration variables for the RIO_M instance
+	int InitializeRIO(int bufferSize, DWORD bufferCount, int spinCount);	//Starts WinSock, Creates Buffer Manger and Registers Buffers
+	HANDLE CreateIOCP();													//Creates a new IOCP for the RIO_M instance
 
 	//Overloaded Series of Functions to Create a New RIO Completion Queue
-	CQ_Handler CreateCQ(HANDLE hIOCP, COMPLETION_KEY completionKey);	//IOCP Queue and Completion Key specified (For Multi-CQ system with Multi-IOCP)
-	CQ_Handler CreateCQ(COMPLETION_KEY completionKey);					//Create CQ with default IOCP Queue but custom Completion Key (For creating Multi-CQ system with one IOCP)
-	CQ_Handler CreateCQ(HANDLE hIOCP);									//Create CQ with IOCP Queue specified (For creating main-CQ in Multi-IOCP system)
-	CQ_Handler CreateCQ();												//Default (For creating main-CQ for main-IOCP queue)
+	CQ_Handler CreateCQ(int size, HANDLE hIOCP, COMPLETION_KEY completionKey);		//IOCP Queue and Completion Key specified (For Multi-CQ system with Multi-IOCP)
+	CQ_Handler CreateCQ(int size, COMPLETION_KEY completionKey);					//Create CQ with default IOCP Queue but custom Completion Key (For creating Multi-CQ system with one IOCP)
+	CQ_Handler CreateCQ(int size, HANDLE hIOCP);									//Create CQ with IOCP Queue specified (For creating main-CQ in Multi-IOCP system)
+	CQ_Handler CreateCQ(int size);													//Default (For creating main-CQ for main-IOCP queue)
 
 	//Overloaded Series of Functions to Create a new RIO Socket of various types
-	int CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP);	//Any Type of Socket 
+	int CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP,
+						int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired);	//Any Type of Socket
+	//int CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP);	//Any Type of Socket 
 	int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ);							//TCP Client or Server with CQs specified
-	int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket);							//TCP Client or Server with CQs specified
+	//int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket);							//TCP Client or Server with CQs specified
+	int CreateRIOSocket(SocketType socketType, int serviceType, int port, 
+		int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired);
 	int CreateRIOSocket(SocketType socketType, int serviceType, int port); //UDP Service with defaults or TCP listener with defaults
 
 	int SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sendCQ);
@@ -109,10 +115,10 @@ public:
 	void Shutdown();
 
 private:
-	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction);
-	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection);
-	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction);
-	int CreateNewService(int typeCode, int portNumber, bool isUDPService, SOCKET listeningSocket);
+	int CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction);
+	int CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection);
+	int CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction);
+	int CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket);
 	int AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ, SOCKET socket, CRITICAL_SECTION criticalSection);
 	SOCKET GetListeningSocket(int typeCode);
 	int BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped, LPFN_ACCEPTEX acceptExFunction);

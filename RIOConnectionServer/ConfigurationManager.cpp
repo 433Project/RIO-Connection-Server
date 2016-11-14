@@ -15,6 +15,7 @@
 //	SERVICE_MAX_ACCEPTS,
 //	SERVICE_RQ_MAX_RECEIVES,
 //	SERVICE_RQ_MAX_SENDS
+//	SERVICE_ADDRESS_REQUIRED
 //};
 
 
@@ -32,7 +33,7 @@ ConfigurationManager::ConfigurationManager()
 	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_MAX_ACCEPTS", SERVICE_MAX_ACCEPTS));
 	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_RQ_MAX_RECEIVES", SERVICE_RQ_MAX_RECEIVES));
 	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_RQ_MAX_SENDS", SERVICE_RQ_MAX_SENDS));
-
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_ADDRESS_REQUIRED", SERVICE_ADDRESS_REQUIRED));
 }
 
 
@@ -161,6 +162,15 @@ int ConfigurationManager::LoadConfiguration(string filename) {
 
 		case SERVICE_RQ_MAX_SENDS:
 			serviceData->serviceRQMaxSends = valueConverted;
+			break;
+
+		case SERVICE_ADDRESS_REQUIRED:
+			if (valueConverted == 1) {
+				serviceData->isAddressRequired = true;
+			}
+			else {
+				serviceData->isAddressRequired = false;
+			}
 			break;
 		}
 	}
