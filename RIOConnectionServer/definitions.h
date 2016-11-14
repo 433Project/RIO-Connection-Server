@@ -147,6 +147,10 @@ struct ServiceData {
 	int serviceRQMaxReceives;
 	int serviceRQMaxSends;
 
+	ServiceData() {
+
+	}
+
 	ServiceData(SocketType servType, int code, int port) {
 		serviceType = servType;
 		serviceCode = code;

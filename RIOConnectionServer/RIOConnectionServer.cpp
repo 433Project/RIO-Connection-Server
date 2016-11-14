@@ -2,6 +2,7 @@
 #include <thread>
 #include "RIOManager.h"
 #include "ProcessManager.h"
+#include "ConfigurationManager.h"
 
 //#define		TRACK_MESSAGES
 
@@ -24,10 +25,17 @@ int _tmain(int argc, _TCHAR* argv[])
 {
 	std::vector<std::thread*> threadPool;
 	std::vector<ServiceData> services;
+	RIOMainConfig rioMainConfig;
 
 	//***SETUP***
-	BasicConnectionServerHandles connectionServer;
 
+	ConfigurationManager* configManager = new ConfigurationManager();
+
+	configManager->LoadConfiguration("C:\\RIOConfig\\config.txt");
+	rioMainConfig = configManager->GetRIOConfiguration();
+	services = configManager->GetServiceConfiguration();
+
+	BasicConnectionServerHandles connectionServer;
 
 	InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, 4000);//
 	connectionServer.rioManager.AssignConsoleCriticalSection(consoleCriticalSection);//
@@ -43,6 +51,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	//Load Services
 
+
 	//enum DestinationType
 	//{
 	//	MATCHING_SERVER = 0,		8433
@@ -52,22 +61,22 @@ int _tmain(int argc, _TCHAR* argv[])
 	//	MONITORING_SERVER = 4		11433
 	//};
 
-	services.push_back(*(new ServiceData(TCPListener, 0, 8433)));
+	/*services.push_back(*(new ServiceData(TCPListener, 0, 8433)));
 	services.push_back(*(new ServiceData(TCPListener, 1, 10433)));
 	services.push_back(*(new ServiceData(TCPListener, 2, 9433)));
 	services.push_back(*(new ServiceData(UDPSocket, 3, 5050)));
-	services.push_back(*(new ServiceData(TCPListener, 4, 11433)));
+	services.push_back(*(new ServiceData(TCPListener, 4, 11433)));*/
 
 	//Create basic UDPSocket at Port 5050
 	//connectionServer.rioManager.CreateRIOSocket(UDPSocket, 1, 5050);
 	//connectionServer.rioManager.CreateRIOSocket(TCPListener, 2, 10433);
 	for each (auto serviceData in services)
-	{
+	{	
 		connectionServer.rioManager.CreateRIOSocket(serviceData.serviceType, serviceData.serviceCode, serviceData.servicePort);
 	}
 
 	//Start threads and keep track of them
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < rioMainConfig.numThreads; i++)
 	{
 		std::thread* thread = new std::thread(MainProcess, &connectionServer, i);
 		threadPool.emplace_back(thread);

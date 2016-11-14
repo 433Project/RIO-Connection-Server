@@ -1,9 +1,38 @@
 #include "stdafx.h"
 #include "ConfigurationManager.h"
 
+//enum CONFIGURATION_COMMANDS {
+//	BUFFER_SIZE = 0,
+//	DEQUEUE_COUNT,
+//	NUM_THREADS,
+//	SPINCOUNT,
+//
+//	NEW_SERVICE = 10,
+//	SERVICE_TYPE,
+//	SERVICE_CODE,
+//	SERVICE_PORT,
+//	SERVICE_MAX_CLIENTS,
+//	SERVICE_MAX_ACCEPTS,
+//	SERVICE_RQ_MAX_RECEIVES,
+//	SERVICE_RQ_MAX_SENDS
+//};
+
 
 ConfigurationManager::ConfigurationManager()
 {
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("BUFFER_SIZE", BUFFER_SIZE));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("DEQUEUE_COUNT", DEQUEUE_COUNT));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("NUM_THREADS", NUM_THREADS));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SPINCOUNT", SPINCOUNT));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("NEW_SERVICE", NEW_SERVICE));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_TYPE", SERVICE_TYPE));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_CODE", SERVICE_CODE));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_PORT", SERVICE_PORT));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_MAX_CLIENTS", SERVICE_MAX_CLIENTS));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_MAX_ACCEPTS", SERVICE_MAX_ACCEPTS));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_RQ_MAX_RECEIVES", SERVICE_RQ_MAX_RECEIVES));
+	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("SERVICE_RQ_MAX_SENDS", SERVICE_RQ_MAX_SENDS));
+
 }
 
 
@@ -36,6 +65,7 @@ int ConfigurationManager::LoadConfiguration(string filename) {
 	string s, key, value;
 	int valueConverted;
 	int serviceCount = 0;
+	ServiceData* serviceData = new ServiceData();
 
 	//Read through each line of the file and extract information
 	while (getline(file, s)) {
@@ -75,9 +105,67 @@ int ConfigurationManager::LoadConfiguration(string filename) {
 		// LOGIC FOR INTERPRETING KEY/VALUE PAIRS
 		// ######################################
 
-		//if (string::compare(key)
+		if (configMap.find(key) == configMap.end()) {
+			continue;
+		}
 
+		switch (configMap.find(key)->second) {
+
+		case BUFFER_SIZE:
+			rioMainConfig.bufferSize = valueConverted;
+			break;
+
+		case DEQUEUE_COUNT:
+			rioMainConfig.dequeueCount = valueConverted;
+			break;
+
+		case NUM_THREADS:
+			rioMainConfig.numThreads = valueConverted;
+			break;
+
+		case SPINCOUNT:
+			rioMainConfig.spinCount = valueConverted;
+			break;
+
+		case NEW_SERVICE:
+			if (serviceCount > 0) {
+				services.push_back(*serviceData);
+			}
+			serviceCount++;
+			serviceData = new ServiceData();
+			break;
+
+		case SERVICE_TYPE:
+			serviceData->serviceType = (SocketType)valueConverted;
+			break;
+
+		case SERVICE_CODE:
+			serviceData->serviceCode = valueConverted;
+			break;
+
+		case SERVICE_PORT:
+			serviceData->servicePort = valueConverted;
+			break;
+
+		case SERVICE_MAX_CLIENTS:
+			serviceData->serviceMaxClients = valueConverted;
+			break;
+
+		case SERVICE_MAX_ACCEPTS:
+			serviceData->serviceMaxAccepts = valueConverted;
+			break;
+
+		case SERVICE_RQ_MAX_RECEIVES:
+			serviceData->serviceRQMaxReceives = valueConverted;
+			break;
+
+		case SERVICE_RQ_MAX_SENDS:
+			serviceData->serviceRQMaxSends = valueConverted;
+			break;
+		}
 	}
+
+	services.push_back(*serviceData);
 
 	file.close();
 	return 0;
