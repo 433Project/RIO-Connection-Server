@@ -17,6 +17,9 @@ struct ConnectionServerService {
 	//Main components
 	int port;
 	int maxClients;
+	int serviceMaxAccepts;
+	int serviceRQMaxReceives;
+	int serviceRQMaxSends;
 	CQ_Handler receiveCQ;
 	CQ_Handler sendCQ;
 	bool isUDPService;
@@ -86,9 +89,10 @@ public:
 						int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired);	//Any Type of Socket
 	//int CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP);	//Any Type of Socket 
 	int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ);							//TCP Client or Server with CQs specified
-	//int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket);							//TCP Client or Server with CQs specified
+	
 	int CreateRIOSocket(SocketType socketType, int serviceType, int port, 
 		int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired);
+	int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket);							//TCP Client or Server with CQs specified
 	int CreateRIOSocket(SocketType socketType, int serviceType, int port); //UDP Service with defaults or TCP listener with defaults
 
 	int SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sendCQ);
@@ -115,10 +119,10 @@ public:
 	void Shutdown();
 
 private:
-	int CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction);
-	int CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection);
-	int CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction);
-	int CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket);
+	int CreateNewService(int typeCode, int portNumber, int maxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction);
+	int CreateNewService(int typeCode, int portNumber, int maxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection);
+	int CreateNewService(int typeCode, int portNumber, int maxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction);
+	int CreateNewService(int typeCode, int portNumber, int maxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket);
 	int AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ, SOCKET socket, CRITICAL_SECTION criticalSection);
 	SOCKET GetListeningSocket(int typeCode);
 	int BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped, LPFN_ACCEPTEX acceptExFunction);

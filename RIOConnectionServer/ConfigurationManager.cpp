@@ -45,12 +45,32 @@ ConfigurationManager::~ConfigurationManager()
 
 Sample Config file style:
 
-#Comment
-#Comment
+#Configuration Data for RIO Connection Server
 
-value = 1
+BUFFER_SIZE              = 100
+DEQUEUE_COUNT            = 1000
+NUM_THREADS              = 4
+SPINCOUNT                = 4000
 
+NEW_SERVICE
+SERVICE_TYPE             = 1
+SERVICE_CODE             = 0
+SERVICE_PORT             = 8433
+SERVICE_MAX_CLIENTS      = 10
+SERVICE_MAX_ACCEPTS      = 3
+SERVICE_RQ_MAX_RECEIVES  = 10000
+SERVICE_RQ_MAX_SENDS     = 10000
+SERVICE_ADDRESS_REQUIRED = 0
 
+NEW_SERVICE
+SERVICE_TYPE             = 1
+SERVICE_CODE             = 1
+SERVICE_PORT             = 10433
+SERVICE_MAX_CLIENTS      = 10
+SERVICE_MAX_ACCEPTS      = 3
+SERVICE_RQ_MAX_RECEIVES  = 10000
+SERVICE_RQ_MAX_SENDS     = 10000
+SERVICE_ADDRESS_REQUIRED = 1
 
 */
 

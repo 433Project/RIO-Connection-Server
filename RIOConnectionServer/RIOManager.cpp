@@ -226,6 +226,21 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		isListener = false;
 		requiresBind = false;
 		setsockopt(newSocket, IPPROTO_TCP, TCP_NODELAY, (const char*)&option, sizeof(option));
+
+		if (serviceRQMaxReceives == 0) { //If the function didn't supply maximum values, need to get these from the service
+			EnterCriticalSection(&serviceListCriticalSection);
+			ServiceList::iterator iter = serviceList.find(serviceType);
+			if (iter != serviceList.end()) {
+				ConnectionServerService* connServ = &iter->second;
+				serviceRQMaxReceives = connServ->serviceRQMaxReceives;
+				serviceRQMaxSends = connServ->serviceRQMaxSends;
+			}
+			else {
+				return -10; //Invalid service type
+			}
+			LeaveCriticalSection(&serviceListCriticalSection);
+		}
+
 		break;
 
 	default:
@@ -292,7 +307,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		}
 
 		//Create a new service to represent this new listening socket
-		if (CreateNewService(serviceType, port, serviceMaxClients, isAddressRequired, false, newSocket, acceptExFunction) < 0) {
+		if (CreateNewService(serviceType, port, serviceMaxClients, serviceMaxAccepts, serviceRQMaxReceives, serviceRQMaxSends, isAddressRequired, false, newSocket, acceptExFunction) < 0) {
 			PrintMessageFormatter(1, "ERROR", "Could not register new service.");
 			return -8;
 		}
@@ -336,7 +351,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 
 		//Add a socket to a service and Post Initial Receives
 		if (socketType == UDPSocket) {
-			if (CreateNewService(serviceType, port, 0, false, true, newSocket, rio_RQ, criticalSection) < 0) {
+			if (CreateNewService(serviceType, port, 0, 0, serviceRQMaxReceives, serviceRQMaxSends, false, true, newSocket, rio_RQ, criticalSection) < 0) {
 				PrintMessageFormatter(1, "ERROR", "Could not register new service.");
 				return -8;
 			}
@@ -375,10 +390,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET r
 	return CreateRIOSocket(socketType, serviceType, relevantSocket, 0, receiveCQ, sendCQ, GetMainIOCP(),
 		0, 0, 0, 0, false);
 }
-//
-//int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket) {
-//	return CreateRIOSocket(socketType, serviceType, 0, newSocket, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP());
-//}
+
 
 int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port,
 	int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired) {
@@ -387,6 +399,10 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		serviceMaxClients, serviceMaxAccepts, serviceRQMaxReceives, serviceRQMaxSends, isAddressRequired);
 }
 
+int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket) {
+	return CreateRIOSocket(socketType, serviceType, 0, newSocket, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP(),
+		0, 0, 0, 0, false);
+}
 
 int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port) {
 	SOCKET socket = INVALID_SOCKET;
@@ -995,7 +1011,7 @@ void RIOManager::Shutdown() {
 
 ///This function creates a new service in the RIO Manager service list.
 ///Note that the receive and send CQs are set to the default value.
-int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection, LPFN_ACCEPTEX acceptExFunction) {
 	if (serviceList.find(typeCode) != serviceList.end()) {
 		return -1;		//Service already exists
 	}
@@ -1014,6 +1030,9 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, b
 	service.isAddressRequired = isAddressRequired;
 	service.roundRobinLocation = 0;
 	service.maxClients = maxClients;
+	service.serviceMaxAccepts = serviceMaxAccepts;
+	service.serviceRQMaxReceives = serviceRQMaxReceives;
+	service.serviceRQMaxSends = serviceRQMaxSends;
 
 	InitializeCriticalSectionAndSpinCount(&service.roundRobinCriticalSection, rioSpinCount);
 	InitializeCriticalSectionAndSpinCount(&service.socketListCriticalSection, rioSpinCount);
@@ -1030,23 +1049,23 @@ int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, b
 //	return CreateNewService(typeCode, portNumber, maxClients, isAddressRequired, isUDPService, listeningSocket, udpRQ, udpCriticalSection, nullptr);
 //}
 
-int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection) {
-	return CreateNewService(typeCode, portNumber, maxClients, isAddressRequired, isUDPService, listeningSocket, udpRQ, udpCriticalSection, nullptr);
+int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, RIO_RQ udpRQ, CRITICAL_SECTION udpCriticalSection) {
+	return CreateNewService(typeCode, portNumber, maxClients, serviceMaxAccepts, serviceRQMaxReceives, serviceRQMaxSends, isAddressRequired, isUDPService, listeningSocket, udpRQ, udpCriticalSection, nullptr);
 }
 
-int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket, LPFN_ACCEPTEX acceptExFunction) {
 	CRITICAL_SECTION emptyCriticalSection;
 	InitializeCriticalSectionAndSpinCount(&emptyCriticalSection, rioSpinCount);
-	return CreateNewService(typeCode, portNumber, maxClients, isAddressRequired, isUDPService, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, acceptExFunction);
+	return CreateNewService(typeCode, portNumber, maxClients, serviceMaxAccepts, serviceRQMaxReceives, serviceRQMaxSends, isAddressRequired, isUDPService, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, acceptExFunction);
 }
 
 
 ///This function creates a new service in the RIO Manager service list.
 ///Note that the receive and send CQs are set to the default value.
-int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket) {
+int RIOManager::CreateNewService(int typeCode, int portNumber, int maxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket) {
 	CRITICAL_SECTION emptyCriticalSection;
 	InitializeCriticalSectionAndSpinCount(&emptyCriticalSection, rioSpinCount);
-	return CreateNewService(typeCode, portNumber, maxClients, isAddressRequired, isUDPService, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, nullptr);
+	return CreateNewService(typeCode, portNumber, maxClients, serviceMaxAccepts, serviceRQMaxReceives, serviceRQMaxSends, isAddressRequired, isUDPService, listeningSocket, RIO_INVALID_RQ, emptyCriticalSection, nullptr);
 }
 
 
