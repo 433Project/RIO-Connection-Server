@@ -67,6 +67,7 @@ class RIOManager
 	GUID acceptExID = WSAID_ACCEPTEX;
 	DWORD dwBytes = 0;
 	int rioSpinCount = 4000;	//Default spincount of 4000
+	int dequeueCount = 2000;	//Default dequeue count of 2000
 
 	//Data Structures for Managing Servers/Clients
 	ServiceList serviceList;	//Keeps track of all generated services
@@ -75,7 +76,7 @@ public:
 	RIOManager();
 	~RIOManager();
 	int SetConfiguration(_TCHAR* config[]);									//Assigns configuration variables for the RIO_M instance
-	int InitializeRIO(int bufferSize, DWORD bufferCount, int spinCount);	//Starts WinSock, Creates Buffer Manger and Registers Buffers
+	int InitializeRIO(int bufferSize, DWORD bufferCount, int spinCount, int rioDequeueCount);	//Starts WinSock, Creates Buffer Manger and Registers Buffers
 	HANDLE CreateIOCP();													//Creates a new IOCP for the RIO_M instance
 
 	//Overloaded Series of Functions to Create a New RIO Completion Queue

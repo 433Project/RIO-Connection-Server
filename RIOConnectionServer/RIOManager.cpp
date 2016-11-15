@@ -14,9 +14,10 @@ int RIOManager::SetConfiguration(_TCHAR* config[]) {
 }
 
 ///This function loads WinSock and initiates the RIOManager basic needs such as registered buffers.
-int RIOManager::InitializeRIO(int bufferSize, DWORD bufferCount, int spinCount)
+int RIOManager::InitializeRIO(int bufferSize, DWORD bufferCount, int spinCount, int rioDequeueCount)
 {
 	rioSpinCount = spinCount;
+	dequeueCount = rioDequeueCount;
 	InitializeCriticalSectionAndSpinCount(&serviceListCriticalSection, spinCount);
 
 	// 1. Initialize WinSock
@@ -459,7 +460,7 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 
 	//Enter critical section of the CQ we are trying to access
 	EnterCriticalSection(&(cqHandler.criticalSection));
-	int numResults = rioFunctions.RIODequeueCompletion(cqHandler.rio_CQ, rioResults, 1000); ////Maximum array size
+	int numResults = rioFunctions.RIODequeueCompletion(cqHandler.rio_CQ, rioResults, dequeueCount); ////Maximum array size
 	//Leave the critical section asap so another thread can access asap
 	LeaveCriticalSection(&(cqHandler.criticalSection));
 
