@@ -52,52 +52,49 @@ typedef deque<CQ_Handler> CQList;
 class RIOManager
 {
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctions; 
-	LPFN_ACCEPTEX acceptExFunctionMain;
 	BufferManager bufferManager;
 	EXTENDED_OVERLAPPED mainExtendedOverlapped;
 
 	CRITICAL_SECTION consoleCriticalSection;
 	CRITICAL_SECTION serviceListCriticalSection;
-	std::vector<CRITICAL_SECTION> criticalSectionDump;
+	ServiceList serviceList;	//Keeps track of all generated services
+
 	
 	HandleList iocpList;		//Keep track of all IOCP queues for cleanup
 	SOCKET socketRIO;			//A dedicated socket in order to load extension functions
 	CQList rioCQList;			//Keep track of all RIO CQs for cleanup
-	GUID rioFunctionTableID = WSAID_MULTIPLE_RIO;
-	GUID acceptExID = WSAID_ACCEPTEX;
-	DWORD dwBytes = 0;
-	int rioSpinCount = 4000;	//Default spincount of 4000
-	int dequeueCount = 2000;	//Default dequeue count of 2000
+	std::vector<CRITICAL_SECTION> criticalSectionDump;
 
-	//Data Structures for Managing Servers/Clients
-	ServiceList serviceList;	//Keeps track of all generated services
+	GUID rioFunctionTableID		= WSAID_MULTIPLE_RIO;
+	GUID acceptExID				= WSAID_ACCEPTEX;
+	DWORD dwBytes				= 0;
+	int rioSpinCount			= 4000;	//Default spincount of 4000
+	int dequeueCount			= 2000;	//Default dequeue count of 2000
+
 
 public:
 	RIOManager();
 	~RIOManager();
-	int SetConfiguration(_TCHAR* config[]);									//Assigns configuration variables for the RIO_M instance
+
+	//Setup and configuration functions
 	int InitializeRIO(int bufferSize, DWORD bufferCount, int spinCount, int rioDequeueCount);	//Starts WinSock, Creates Buffer Manger and Registers Buffers
 	HANDLE CreateIOCP();													//Creates a new IOCP for the RIO_M instance
-
 	//Overloaded Series of Functions to Create a New RIO Completion Queue
 	CQ_Handler CreateCQ(int size, HANDLE hIOCP, COMPLETION_KEY completionKey);		//IOCP Queue and Completion Key specified (For Multi-CQ system with Multi-IOCP)
 	CQ_Handler CreateCQ(int size, COMPLETION_KEY completionKey);					//Create CQ with default IOCP Queue but custom Completion Key (For creating Multi-CQ system with one IOCP)
 	CQ_Handler CreateCQ(int size, HANDLE hIOCP);									//Create CQ with IOCP Queue specified (For creating main-CQ in Multi-IOCP system)
 	CQ_Handler CreateCQ(int size);													//Default (For creating main-CQ for main-IOCP queue)
-
 	//Overloaded Series of Functions to Create a new RIO Socket of various types
 	int CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP,
 						int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired);	//Any Type of Socket
 	//int CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP);	//Any Type of Socket 
 	int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ);							//TCP Client or Server with CQs specified
-	
 	int CreateRIOSocket(SocketType socketType, int serviceType, int port, 
 		int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired);
 	int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket);							//TCP Client or Server with CQs specified
 	int CreateRIOSocket(SocketType socketType, int serviceType, int port); //UDP Service with defaults or TCP listener with defaults
 
 	int SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sendCQ);
-	int SetServiceAddressSpecificity(int serviceType, bool isAddressRequired);
 
 	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler);
 	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults);
@@ -108,10 +105,8 @@ public:
 
 	int NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped);
 
-	//TEMPS
 	int RIONotifyIOCP(RIO_CQ  rioCQ);
 	void AssignConsoleCriticalSection(CRITICAL_SECTION critSec);
-	//
 
 	void CheckCriticalSections();
 	void PrintServiceInformation();
@@ -126,16 +121,22 @@ private:
 	int CreateNewService(int typeCode, int portNumber, int maxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired, bool isUDPService, SOCKET listeningSocket);
 	int AddEntryToService(int typeCode, int socketContext, RIO_RQ rioRQ, SOCKET socket, CRITICAL_SECTION criticalSection);
 	SOCKET GetListeningSocket(int typeCode);
-	int BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped, LPFN_ACCEPTEX acceptExFunction);
 	HANDLE GetMainIOCP();
 	CQ_Handler GetMainRIOCQ();
+
+	//Initiator functions
+	int FillAcceptStructures(int typeCode, int numStruct);
+	int BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped, LPFN_ACCEPTEX acceptExFunction);
 	bool PostReceiveOnUDPService(int serviceType);
 	bool PostReceiveOnTCPService(int serviceType, int destinationCode);
-	int FillAcceptStructures(int typeCode, int numStruct);
+
+	//Clean-up functions
 	int CloseServiceEntry(int typeCode, int socketContext);
 	void CloseAllSockets();
 	void CloseIOCPHandles();
 	void CloseCQs();
+
+	//Printing functions
 	void PrintMessageFormatter(int level, string type, string subtype, string message);
 	void PrintMessageFormatter(int level, string type, string message);
 	void PrintWindowsErrorMessage();

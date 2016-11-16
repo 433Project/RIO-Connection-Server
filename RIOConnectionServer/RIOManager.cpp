@@ -7,12 +7,6 @@ RIOManager::RIOManager()
 
 }
 
-///This function sets the configuration variables for the RIO Manager
-int RIOManager::SetConfiguration(_TCHAR* config[]) {
-
-	return 0;
-}
-
 ///This function loads WinSock and initiates the RIOManager basic needs such as registered buffers.
 int RIOManager::InitializeRIO(int bufferSize, DWORD bufferCount, int spinCount, int rioDequeueCount)
 {
@@ -58,21 +52,6 @@ int RIOManager::InitializeRIO(int bufferSize, DWORD bufferCount, int spinCount, 
 	{
 		PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to retrieve RIO extension functions.");
 		return -3;
-	}
-
-	if (NULL != WSAIoctl(
-		socketRIO,
-		SIO_GET_EXTENSION_FUNCTION_POINTER,
-		&acceptExID,
-		sizeof(GUID),
-		(void**)&acceptExFunctionMain,
-		sizeof(acceptExFunctionMain),
-		&dwBytes,
-		NULL,
-		NULL))
-	{
-		PrintMessageFormatter(1, "ERROR", "WSAIoctl failed to retrieve Accept EX.");
-		return -4;
 	}
 
 	PrintMessageFormatter(1, "SUCCESS", " ");
@@ -432,28 +411,6 @@ int RIOManager::SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sen
 	return 0;
 }
 
-///This function sets a service flag in a particular service to indicate a specific address is required to send
-///to a message to a service
-int RIOManager::SetServiceAddressSpecificity(int serviceType, bool isAddressRequired) {
-	//Find the service entry
-	EnterCriticalSection(&serviceListCriticalSection);
-	ServiceList::iterator iter = serviceList.find(serviceType);
-	if (iter == serviceList.end()) {
-		LeaveCriticalSection(&serviceListCriticalSection);
-		return -1;		//Service doesn't exist
-	}
-	LeaveCriticalSection(&serviceListCriticalSection);
-
-	//Get the service entry
-	ConnectionServerService service;
-	service = iter->second;
-
-	service.isAddressRequired = isAddressRequired;
-
-	return 0;
-}
-
-
 ///This function gets the RIO results from a particular RIO CQ.
 int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler) {
 
@@ -540,8 +497,6 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 				}
 			}
 
-
-
 			results.push_back(tempRIOBuf);
 		}
 	}
@@ -605,9 +560,6 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 		}
 
 		RQ_Handler* rqHandler;
-
-		//PrintMessageFormatter(1, "SOCKETCONTEXT", to_string(instruction.socketContext));
-
 
 		if (instruction.socketContext == 0) {		//No location specification
 

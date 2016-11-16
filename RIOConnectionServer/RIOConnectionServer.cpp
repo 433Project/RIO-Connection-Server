@@ -6,9 +6,6 @@
 
 //#define		TRACK_MESSAGES
 
-inline void ReportError(
-	const char *pFunction, bool willExit);
-
 CRITICAL_SECTION consoleCriticalSection;
 
 struct BasicConnectionServerHandles {
@@ -24,9 +21,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	//##########################################
 	//				Setup/Config
 	//##########################################
-	cout << "* * * * * * * * * * * * * * * * * * * * * * * * * * * *" << endl;
-	cout << "* * * * * 433 Project - RIO-Connection-Server * * * * *" << endl;
-	cout << "* * * * * * * * * * * * * * * * * * * * * * * * * * * *" << endl;
 
 	string configFileLocation = "C:\\RIOConfig\\config.txt";
 
@@ -36,16 +30,31 @@ int _tmain(int argc, _TCHAR* argv[])
 	std::vector<ServiceData> services;
 	RIOMainConfig rioMainConfig;
 	ConfigurationManager* configManager = new ConfigurationManager();
+	BasicConnectionServerHandles connectionServer;
+
 
 	//Load configuration from file
-	configManager->LoadConfiguration(configFileLocation, &rioMainConfig, &services);
-
-	BasicConnectionServerHandles connectionServer;
+	if (configManager->LoadConfiguration(configFileLocation, &rioMainConfig, &services) != 0) {
+		// Error exit - could not load configuration file
+		return 0;
+	}
+	if (services.empty()) {
+		// Error Exit - no services specified
+		return 0;
+	}
+	if (configManager != nullptr) {
+		delete configManager;
+		configManager = nullptr;
+	}
 
 	//For error message console printing, we are creating a critical section to prevent multi-threads
 	//from printing at the same time
-	InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, rioMainConfig.spinCount);
+	if (InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, rioMainConfig.spinCount) == 0) {
+		// Error Exit - can't make console critical section
+		return 0;
+	}
 	connectionServer.rioManager.AssignConsoleCriticalSection(consoleCriticalSection);
+
 
 	//Calculate the number of buffers required to handle all services and the maximum CQ size
 	DWORD numberBuffersRequired = 0;
@@ -60,27 +69,32 @@ int _tmain(int argc, _TCHAR* argv[])
 	cout << "\nRequired number of buffers: \t" << numberBuffersRequired << endl;
 	cout << "Maximum CQ size: \t\t" << maximumCQSize << endl;
 
-	//Initialize the RIO Manager and create our IOCP and CQ
-	connectionServer.rioManager.InitializeRIO(rioMainConfig.bufferSize, 
-				numberBuffersRequired, 
-				rioMainConfig.spinCount,
-				rioMainConfig.dequeueCount);
-	connectionServer.iocp = connectionServer.rioManager.CreateIOCP();
-	CQ_Handler cqHandler = connectionServer.rioManager.CreateCQ(maximumCQSize);
-	connectionServer.cqHandler = cqHandler;
 
-	//Initialize all our services
-	//enum DestinationType
-	//{
-	//	MATCHING_SERVER = 0,		8433
-	//	MATCHING_CLIENT = 1,		10433 (TCP - packet generator okay)
-	//	ROOM_MANAGER = 2,			9433
-	//	PACKET_GENERATOR = 3,		5050 (UDP)
-	//	MONITORING_SERVER = 4		11433
-	//};
+	//Initialize the RIO Manager and create our IOCP and CQ
+	if (connectionServer.rioManager.InitializeRIO(rioMainConfig.bufferSize,
+		numberBuffersRequired,
+		rioMainConfig.spinCount,
+		rioMainConfig.dequeueCount) != 0) {
+		// Error exit - can't initialize RIO
+		return 0;
+	}
+	connectionServer.iocp = connectionServer.rioManager.CreateIOCP();
+	if (connectionServer.iocp == INVALID_HANDLE_VALUE) {
+		// Error exit - couldn't make IOCP
+		return 0;
+	}
+	CQ_Handler cqHandler = connectionServer.rioManager.CreateCQ(maximumCQSize);
+	if (cqHandler.rio_CQ == RIO_INVALID_CQ) {
+		// Error exit - couldn't make CQ
+		return 0;
+	}
+	connectionServer.cqHandler = cqHandler;
+	
+
+	//Create each service
 	for each (auto serviceData in services)
 	{	
-		connectionServer.rioManager.CreateRIOSocket(
+		if (connectionServer.rioManager.CreateRIOSocket(
 			serviceData.serviceType, 
 			serviceData.serviceCode, 
 			serviceData.servicePort,
@@ -88,7 +102,10 @@ int _tmain(int argc, _TCHAR* argv[])
 			serviceData.serviceMaxAccepts,
 			serviceData.serviceRQMaxReceives,
 			serviceData.serviceRQMaxSends,
-			serviceData.isAddressRequired);
+			serviceData.isAddressRequired) != 0) {
+			// Error exit - error creating service
+			return 0;
+		}
 	}
 
 	//##########################################
@@ -165,8 +182,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	//Wait for threads to exit
 	for each(auto thread in threadPool)
 	{
-		thread->join();
-		delete thread;
+		if (thread != nullptr) {
+			thread->join();
+			delete thread;
+		}
 	}
 	threadPool.clear();
 
@@ -183,7 +202,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 	RIORESULT rioResults[1000];					//Maximum rio result load off per RIODequeueCompletion call
 	std::vector<EXTENDED_RIO_BUF*> results;		//Vector of Extended_RIO_BUF structs to give process manager
 	std::vector<Instruction>* instructionSet;
-	EXTENDED_OVERLAPPED* op = 0;
+	EXTENDED_OVERLAPPED* extendedOverlapped = 0;
 	DWORD bytes = 0;
 	ULONG_PTR key = 0;
 	BOOL quitTrigger = false;
@@ -200,7 +219,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 		//		Get Queued Completion Status
 		//##########################################
 
-		if (!GetQueuedCompletionStatus(connectionServer->iocp, &bytes, &key, (OVERLAPPED**)&op, INFINITE)) {
+		if (!GetQueuedCompletionStatus(connectionServer->iocp, &bytes, &key, (OVERLAPPED**)&extendedOverlapped, INFINITE)) {
 			//ERROR
 			EnterCriticalSection(&consoleCriticalSection);
 			cout << "ERROR: Could not call GQCS. . ." << endl;
@@ -272,8 +291,8 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 		case CK_ACCEPT:
 			//cout << "Received Accept Completion." << endl;
 			//connectionServer->rioManager.ConfigureNewSocket(op);
-			connectionServer->rioManager.CreateRIOSocket(TCPConnection, op->serviceType, op->relevantSocket);
-			connectionServer->rioManager.ResetAcceptCall(op);
+			connectionServer->rioManager.CreateRIOSocket(TCPConnection, extendedOverlapped->serviceType, extendedOverlapped->relevantSocket);
+			connectionServer->rioManager.ResetAcceptCall(extendedOverlapped);
 			break;
 
 
@@ -284,7 +303,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 			cout << "\tSends:\t\t" << sendCount << endl;
 			cout << "\tBufferFrees:\t" << freeBufferCount << endl;
 			quitTrigger = true;
-			PostQueuedCompletionStatus(connectionServer->iocp, 0, CK_QUIT, op);
+			PostQueuedCompletionStatus(connectionServer->iocp, 0, CK_QUIT, extendedOverlapped);
 			break;
 
 
@@ -323,16 +342,3 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 		}
 	} // while (true)
 } // Main Process (thread function)
-
-///The ReportError function prints an error message and may shutdown the program if flagged to do so.
-inline void ReportError(
-	const char *pFunction, bool willExit)
-{
-	const DWORD lastError = ::GetLastError();
-
-	cout << "\tError!!! Function - " << pFunction << " failed - " << lastError << endl;
-
-	if (willExit) {
-		exit(0);
-	}
-}

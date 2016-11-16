@@ -73,16 +73,6 @@ enum Status : int
 	NONE
 };
 
-//Some stuff for flat buffer that's not needed in this program
-//table Body
-//{
-//cmd: Command;
-//status: Status;
-//data: string;
-//}
-//
-//root_type Body;
-
 
 struct Body
 {
