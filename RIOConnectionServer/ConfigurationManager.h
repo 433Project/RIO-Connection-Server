@@ -3,11 +3,8 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include <map>
 #include <unordered_map>
 #include <string>
-
-typedef std::map <string, string> Data;
 
 enum CONFIGURATION_COMMANDS {
 	BUFFER_SIZE = 0,
@@ -30,18 +27,12 @@ typedef std::unordered_map <string, CONFIGURATION_COMMANDS> ConfigurationMapping
 
 class ConfigurationManager
 {
-	Data rawData;
-	RIOMainConfig rioMainConfig;
-	std::vector<ServiceData> services;
 	ConfigurationMapping configMap;
 
 public:
 	ConfigurationManager();
 	~ConfigurationManager();
 
-	int LoadConfiguration(string filename);
-	RIOMainConfig GetRIOConfiguration();
-	std::vector<ServiceData> GetServiceConfiguration();
-
+	int LoadConfiguration(string filename, RIOMainConfig* rioMainConfig, std::vector<ServiceData>* services);
 };
 

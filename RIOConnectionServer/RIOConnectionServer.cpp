@@ -38,9 +38,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	ConfigurationManager* configManager = new ConfigurationManager();
 
 	//Load configuration from file
-	configManager->LoadConfiguration(configFileLocation);
-	rioMainConfig = configManager->GetRIOConfiguration();
-	services = configManager->GetServiceConfiguration();
+	configManager->LoadConfiguration(configFileLocation, &rioMainConfig, &services);
 
 	BasicConnectionServerHandles connectionServer;
 

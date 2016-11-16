@@ -1,26 +1,9 @@
 #include "stdafx.h"
 #include "ConfigurationManager.h"
 
-//enum CONFIGURATION_COMMANDS {
-//	BUFFER_SIZE = 0,
-//	DEQUEUE_COUNT,
-//	NUM_THREADS,
-//	SPINCOUNT,
-//
-//	NEW_SERVICE = 10,
-//	SERVICE_TYPE,
-//	SERVICE_CODE,
-//	SERVICE_PORT,
-//	SERVICE_MAX_CLIENTS,
-//	SERVICE_MAX_ACCEPTS,
-//	SERVICE_RQ_MAX_RECEIVES,
-//	SERVICE_RQ_MAX_SENDS
-//	SERVICE_ADDRESS_REQUIRED
-//};
-
-
 ConfigurationManager::ConfigurationManager()
 {
+	// Link strings read from file to CONFIGURATION_COMMANDS enum values
 	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("BUFFER_SIZE", BUFFER_SIZE));
 	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("DEQUEUE_COUNT", DEQUEUE_COUNT));
 	configMap.insert(std::pair<string, CONFIGURATION_COMMANDS>("NUM_THREADS", NUM_THREADS));
@@ -41,41 +24,8 @@ ConfigurationManager::~ConfigurationManager()
 {
 }
 
-/*
 
-Sample Config file style:
-
-#Configuration Data for RIO Connection Server
-
-BUFFER_SIZE              = 100
-DEQUEUE_COUNT            = 1000
-NUM_THREADS              = 4
-SPINCOUNT                = 4000
-
-NEW_SERVICE
-SERVICE_TYPE             = 1
-SERVICE_CODE             = 0
-SERVICE_PORT             = 8433
-SERVICE_MAX_CLIENTS      = 10
-SERVICE_MAX_ACCEPTS      = 3
-SERVICE_RQ_MAX_RECEIVES  = 10000
-SERVICE_RQ_MAX_SENDS     = 10000
-SERVICE_ADDRESS_REQUIRED = 0
-
-NEW_SERVICE
-SERVICE_TYPE             = 1
-SERVICE_CODE             = 1
-SERVICE_PORT             = 10433
-SERVICE_MAX_CLIENTS      = 10
-SERVICE_MAX_ACCEPTS      = 3
-SERVICE_RQ_MAX_RECEIVES  = 10000
-SERVICE_RQ_MAX_SENDS     = 10000
-SERVICE_ADDRESS_REQUIRED = 1
-
-*/
-
-
-int ConfigurationManager::LoadConfiguration(string filename) {
+int ConfigurationManager::LoadConfiguration(string filename, RIOMainConfig* rioMainConfig, std::vector<ServiceData>* services) {
 	ifstream file (filename);	//Open the specified file
 
 	if (!file.is_open()) {
@@ -94,6 +44,7 @@ int ConfigurationManager::LoadConfiguration(string filename) {
 		// ####################################
 		// LOGIC FOR EXTRACTING KEY/VALUE PAIRS
 		// ####################################
+
 		string::size_type begin = s.find_first_not_of(" \f\t\v");
 
 		if (begin == string::npos) {	//Skip line if blank
@@ -120,7 +71,12 @@ int ConfigurationManager::LoadConfiguration(string filename) {
 
 		value = s.substr(begin, end - begin);
 
-		valueConverted = atoi(value.c_str());
+		if (value.empty()) {
+			valueConverted = 0;
+		}
+		else {
+			valueConverted = atoi(value.c_str());
+		}
 
 		// ######################################
 		// LOGIC FOR INTERPRETING KEY/VALUE PAIRS
@@ -133,24 +89,24 @@ int ConfigurationManager::LoadConfiguration(string filename) {
 		switch (configMap.find(key)->second) {
 
 		case BUFFER_SIZE:
-			rioMainConfig.bufferSize = valueConverted;
+			rioMainConfig->bufferSize = valueConverted;
 			break;
 
 		case DEQUEUE_COUNT:
-			rioMainConfig.dequeueCount = valueConverted;
+			rioMainConfig->dequeueCount = valueConverted;
 			break;
 
 		case NUM_THREADS:
-			rioMainConfig.numThreads = valueConverted;
+			rioMainConfig->numThreads = valueConverted;
 			break;
 
 		case SPINCOUNT:
-			rioMainConfig.spinCount = valueConverted;
+			rioMainConfig->spinCount = valueConverted;
 			break;
 
 		case NEW_SERVICE:
 			if (serviceCount > 0) {
-				services.push_back(*serviceData);
+				services->push_back(*serviceData);
 			}
 			serviceCount++;
 			serviceData = new ServiceData();
@@ -195,19 +151,8 @@ int ConfigurationManager::LoadConfiguration(string filename) {
 		}
 	}
 
-	services.push_back(*serviceData);
+	services->push_back(*serviceData);
 
 	file.close();
 	return 0;
-}
-
-RIOMainConfig ConfigurationManager::GetRIOConfiguration() {
-
-
-	return rioMainConfig;
-}
-
-std::vector<ServiceData> ConfigurationManager::GetServiceConfiguration() {
-
-	return services;
 }
