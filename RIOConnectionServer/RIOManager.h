@@ -64,7 +64,6 @@ class RIOManager
 {
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctions; 
 	BufferManager bufferManager;
-	EXTENDED_OVERLAPPED mainExtendedOverlapped;
 
 	CRITICAL_SECTION consoleCriticalSection;
 	CRITICAL_SECTION serviceListCriticalSection;
@@ -147,8 +146,8 @@ private:
 	void CloseCQs();
 
 	//Printing functions
-	void PrintMessageFormatter(int level, string type, string subtype, string message);
-	void PrintMessageFormatter(int level, string type, string message);
+	void PrintMessageFormatter(int level, const string &type, const string &subtype, string message);
+	void PrintMessageFormatter(int level, const string &type, string message);
 	void PrintWindowsErrorMessage();
 	void PrintBox(string word);
 };

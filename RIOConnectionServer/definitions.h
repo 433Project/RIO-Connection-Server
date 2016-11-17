@@ -136,16 +136,6 @@ struct ServiceData {
 	int serviceRQMaxReceives;
 	int serviceRQMaxSends;
 	bool isAddressRequired;
-
-	ServiceData() {
-
-	}
-
-	ServiceData(SocketType servType, int code, int port) {
-		serviceType = servType;
-		serviceCode = code;
-		servicePort = port;
-	}
 };
 
 

@@ -35,8 +35,8 @@ int _tmain(int argc, _TCHAR* argv[])
 		// Error Exit - can't make console critical section
 		return 0;
 	}
-
-	string configFileLocation = "C:\\RIOConfig\\config.txt";
+	//C:\\RIOConfig\\config.txt
+	string configFileLocation = ".\\config.txt";
 
 	PRINT("\nReading configuration data from: ", configFileLocation);
 
@@ -205,7 +205,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 	ProcessManager processManager;
 	RIORESULT rioResults[1000];					//Maximum rio result load off per RIODequeueCompletion call
 	std::vector<EXTENDED_RIO_BUF*> results;		//Vector of Extended_RIO_BUF structs to give process manager
-	std::vector<Instruction>* instructionSet;
+	//std::vector<Instruction>* instructionSet;
 	EXTENDED_OVERLAPPED* extendedOverlapped = 0;
 	DWORD bytes = 0;
 	ULONG_PTR key = 0;
@@ -267,7 +267,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 					sendCount++;
 				}
 
-				instructionSet = processManager.GetInstructions(result);
+				std::vector<Instruction>* instructionSet = processManager.GetInstructions(result);
 
 				for each (auto instruction in *instructionSet)
 				{

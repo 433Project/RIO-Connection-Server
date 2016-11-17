@@ -4,7 +4,7 @@
 
 RIOManager::RIOManager()
 {
-
+	socketRIO = INVALID_SOCKET;
 }
 
 ///This function loads WinSock and initiates the RIOManager basic needs such as registered buffers.
@@ -20,11 +20,11 @@ int RIOManager::InitializeRIO(int bufferSize, DWORD bufferCount, int spinCount, 
 	PRINT_FOUR(0, "RIO MANAGER", "InitializeRIO", "1. Initializing WinSock. . .");
 
 	if (0 != ::WSAStartup(0x202, &wsaData)) {
-		PrintMessageFormatter(1, "ERROR", "WinSock Initialization Failed.");
+		PRINT_THREE(1, "ERROR", "WinSock Initialization Failed.");
 		return -1;
 	}
 
-	PrintMessageFormatter(1, "SUCCESS", " ");
+	PRINT_THREE(1, "SUCCESS", " ");
 
 
 	// 2. Load RIO Extension Functions
@@ -79,7 +79,10 @@ HANDLE RIOManager::CreateIOCP() {
 	//**Register New IOCP with RIO Manager**//
 	iocpList.push_back(hIOCP);
 
+
+#ifdef _DEBUG
 	int length = iocpList.size();
+#endif // _DEBUG
 	PRINT_THREE(1, "SUCCESS", "Created and Added IOCP #" + to_string(length));
 
 	PRINT_THREE(1, "COMPLETE", " ");
@@ -113,8 +116,9 @@ CQ_Handler RIOManager::CreateCQ(int size, HANDLE hIOCP, COMPLETION_KEY completio
 	//*** Need to Store this RIO_CQ handle/Critical Section into the RIO Manager Instance ***
 	rioCQList.push_back(cqHandler);
 
-
+#ifdef _DEBUG
 	int length = rioCQList.size();
+#endif // _DEBUG
 	PRINT_THREE(1, "SUCCESS", "Created and Added RIO CQ #" + to_string(length));
 
 
@@ -224,8 +228,7 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 
 
 	if (newSocket == INVALID_SOCKET) {
-		PrintMessageFormatter(1, "ERROR", "WSASocket failed to generate socket.");
-		PrintWindowsErrorMessage();
+		PRINT_WIN_ERROR(1, "ERROR", "WSASocket failed to generate socket.");
 		return -2;
 	}
 
@@ -417,14 +420,11 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 		return numResults;
 	}
 
-
-	EXTENDED_RIO_BUF* tempRIOBuf;
 	results.clear();					//Clear the thread's results list
-
 	
 	for (int i = 0; i < numResults; i++)
 	{
-		tempRIOBuf = reinterpret_cast<EXTENDED_RIO_BUF*>(rioResults[i].RequestContext);
+		EXTENDED_RIO_BUF* tempRIOBuf = reinterpret_cast<EXTENDED_RIO_BUF*>(rioResults[i].RequestContext);
 		//Check rioresult structure for errors
 		//NOTE - Information on RIORESULT's Status values is unclear
 		//When a client/server force closes, error code 10054 is received (WSAECONNRESET - connection reset by pear)
@@ -565,7 +565,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 			}
 			else {								//Has stored location, need to assign and then switch to next location
 				sockIter = robinIter;
-				robinIter++;					//Goto next element
+				++robinIter;					//Goto next element
 				if (robinIter == sockList->end()) {
 					robinIter = sockList->begin();
 				}
@@ -609,7 +609,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 				}
 				else {								//Has stored location, need to assign and then switch to next location
 					sockIter = robinIter;
-					robinIter++;					//Goto next element
+					++robinIter;					//Goto next element
 					if (robinIter == sockList->end()) {
 						robinIter = sockList->begin();
 					}
@@ -847,9 +847,6 @@ int RIOManager::ResetAcceptCall(EXTENDED_OVERLAPPED* extendedOverlapped) {
 ///This function goes through the service list and prints relevant information
 void RIOManager::PrintServiceInformation() {
 	ConnectionServerService* connectionServerService;
-	SocketList* sockList;
-	RQ_Handler* rqHandler;
-	SOCKET* socket;
 
 	PRINT_THREE(1, "PrintServiceInformation", "Printing all service information. . .");
 	int i = 1;
@@ -874,8 +871,7 @@ void RIOManager::PrintServiceInformation() {
 
 		PRINT_THREE(3, "# Connections", to_string((connectionServerService->socketList->size())));
 		
-		sockList = connectionServerService->socketList;
-		RQ_Handler rqHandler;
+		SocketList* sockList = connectionServerService->socketList;
 		EnterCriticalSection(&connectionServerService->socketListCriticalSection);
 		//iterate through all sockets associated with the service
 		for (auto it = (*sockList).begin(); it != (*sockList).end(); ++it) {
@@ -1078,19 +1074,21 @@ int RIOManager::FillAcceptStructures(int typeCode, int numStruct) {
 	ConnectionServerService* service;
 	service = &iter->second;
 
-	EXTENDED_OVERLAPPED* exOver;
-
 	for (int i = 0; i < numStruct; i++) {
-		exOver = new EXTENDED_OVERLAPPED();
+		EXTENDED_OVERLAPPED* exOver = new EXTENDED_OVERLAPPED();
 		exOver->serviceType = typeCode;
 		exOver->relevantSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_IP, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
 		if (exOver->relevantSocket == INVALID_SOCKET) {
-			PRINT_THREE(3, "Error", "FillAcceptStructures(); Number of accepts posted = " + to_string(i));
+			PRINT_WIN_ERROR(3, "Error", "WSASocket failed during FillAcceptStructures(); Number of accepts posted = " + to_string(i));
 			return i;
 		}
 		service->acceptStructs.push_back(*exOver);
 
 		int test = BeginAcceptEx(exOver, service->acceptExFunction);
+		if (test != 0) {	//AcceptEx failed (except for WSA_IO_PENDING)
+			PRINT_THREE(3, "Error", "BeginAcceptEx() failed during FillAcceptStructures(); Number of accepts posted = " + to_string(i));
+			return i;
+		}
 	}
 
 	return numStruct;
@@ -1248,15 +1246,13 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 
 ///This function goes through the list of IOCP handles and closes them all for proper cleanup
 void RIOManager::CloseIOCPHandles() {
-	HANDLE goodbyeIOCP;
-
 
 	PRINT_THREE(1, "CloseIOCPHandles", "Closing all IOCP Handles. . .");
 	int i = 1;
 
 
 	while (!iocpList.empty()) {
-		goodbyeIOCP = iocpList.front();
+		HANDLE goodbyeIOCP = iocpList.front();
 
 		PRINT_THREE(2, "LOOP", "Closing IOCP Handle #" + to_string(i));
 		i++;
@@ -1298,7 +1294,6 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 	ConnectionServerService* connectionServerService;
 	SocketList* sockList;
 	RQ_Handler* rqHandler;
-	SOCKET* socket;
 
 	//Find the service entry
 	EnterCriticalSection(&serviceListCriticalSection);
@@ -1345,9 +1340,7 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 ///This function closes all sockets stored within the service list.
 void RIOManager::CloseAllSockets() {
 	ConnectionServerService* connectionServerService;
-	SocketList* sockList;
 	RQ_Handler* rqHandler;
-	SOCKET* socket;
 
 
 	PRINT_THREE(1, "CloseAllSockets", "Closing all sockets (and RIO RQs). . .");
@@ -1367,7 +1360,7 @@ void RIOManager::CloseAllSockets() {
 
 		closesocket((*connectionServerService).listeningSocket);
 
-		sockList = (*connectionServerService).socketList;
+		SocketList* sockList = (*connectionServerService).socketList;
 		//iterate through all sockets associated with the service
 		EnterCriticalSection(&connectionServerService->socketListCriticalSection);
 		for (auto it = (*sockList).begin(); it != (*sockList).end(); ++it) {
@@ -1393,7 +1386,7 @@ void RIOManager::CloseAllSockets() {
 }
 
 ///This function prints a message to console with a specified format (two boxes).
-void RIOManager::PrintMessageFormatter(int level, string type, string subtype, string message) {
+void RIOManager::PrintMessageFormatter(int level, const string &type, const string &subtype, string message) {
 	EnterCriticalSection(&consoleCriticalSection);
 	if (level == 0) {
 		printf_s("\n");
@@ -1416,7 +1409,7 @@ void RIOManager::PrintMessageFormatter(int level, string type, string subtype, s
 }
 
 ///This function prints a message to console with a specified format (one box).
-void RIOManager::PrintMessageFormatter(int level, string type, string message) {
+void RIOManager::PrintMessageFormatter(int level, const string &type, string message) {
 	EnterCriticalSection(&consoleCriticalSection);
 
 	if (level == 0) {
