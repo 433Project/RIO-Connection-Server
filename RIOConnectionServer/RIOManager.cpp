@@ -190,7 +190,10 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		isListener = true;
 		requiresBind = true;
 		newSocket = WSASocket(AF_INET, type, ipProto, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
-		setsockopt(newSocket, IPPROTO_TCP, TCP_NODELAY, (const char*)&option, sizeof(option));
+		/*if (setsockopt(newSocket, IPPROTO_TCP, TCP_NODELAY, (const char*)&option, sizeof(option)) != 0) {
+			PRINT_WIN_ERROR(1, "ERROR", "setsockopt failed.");
+			return -11;
+		}*/
 		break;
 
 		//Accepted Socket Cases
@@ -201,7 +204,10 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		controlCode = SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER;
 		isListener = false;
 		requiresBind = false;
-		setsockopt(newSocket, IPPROTO_TCP, TCP_NODELAY, (const char*)&option, sizeof(option));
+		/*if (setsockopt(newSocket, IPPROTO_TCP, TCP_NODELAY, (const char*)&option, sizeof(option)) != 0) {
+			PRINT_WIN_ERROR(1, "ERROR", "setsockopt failed.");
+			return -11;
+		}*/
 
 		if (serviceRQMaxReceives == 0) { //If the function didn't supply maximum values, need to get these from the service
 			EnterCriticalSection(&serviceListCriticalSection);
@@ -290,6 +296,8 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 
 	else {		//********Non-Listeners******
 
+		PRINT_THREE(1, "Non-Listen", "Additional setup. . .");
+
 		if (NULL != WSAIoctl(
 			newSocket,
 			controlCode,
@@ -310,6 +318,8 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 		InitializeCriticalSectionAndSpinCount(&criticalSection, rioSpinCount); //Add Spin Count Parameter here
 
 		int socketContext = (int)newSocket;
+
+		PRINT_THREE(2, "RIO RQ", "Creating request queue. . .");
 
 		rio_RQ = rioFunctions.RIOCreateRequestQueue(
 			newSocket, serviceRQMaxReceives, 1,				//MAX_PENDING_RECEIVES_UDP, MAX_PENDING_SENDS_UDP
@@ -333,10 +343,12 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 			}
 		}
 		else {
+			PRINT_THREE(2, "AddEntryToService", "Addinging service entry. . .");
 			if (AddEntryToService(serviceType, socketContext, rio_RQ, newSocket, criticalSection) < 0) {
 				PRINT_THREE(1, "ERROR", "Could add entry to service.");
 				return -9;
 			}
+			PRINT_THREE(2, "Post TCP", "Positing initial TCP receives. . .");
 			for (int y = 0; y < serviceRQMaxReceives; y++) {
 				if (!PostReceiveOnTCPService(serviceType, (int)newSocket)) {
 					PRINT_WIN_ERROR(2, "ERROR", "Failed to Post Receive on new TCP entry.");
@@ -404,12 +416,9 @@ int RIOManager::SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sen
 int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler) {
 
 
-	//Enter critical section of the CQ we are trying to access
 	EnterCriticalSection(&(cqHandler.criticalSection));
 	int numResults = rioFunctions.RIODequeueCompletion(cqHandler.rio_CQ, rioResults, dequeueCount); ////Maximum array size
-	//Leave the critical section asap so another thread can access asap
 	LeaveCriticalSection(&(cqHandler.criticalSection));
-
 
 	if (numResults == RIO_CORRUPT_CQ) {
 		PRINT_WIN_ERROR(1, "ERROR", "RIO_CORRUPT_CQ upon RIODequeueCompletion.");
@@ -1185,6 +1194,9 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 		PRINT_THREE(1, "ERROR", "Could not post receive. Erroneous destination code on TCP Service of value #" + to_string(serviceType));
 		return false;
 	}
+
+	//if (serviceType == 1)
+	//	PRINT_THREE(3, "Test Point", "1");
 	
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
 	if (rioBuf == nullptr) {
@@ -1193,11 +1205,17 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 		return false;
 	}
 
+	//if (serviceType == 1)
+	//	PRINT_THREE(3, "Test Point", "2");
+
 	rioBuf->operationType = OP_RECEIVE;
 	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
 	LeaveCriticalSection(&serviceListCriticalSection);
+
+	//if (serviceType == 1)
+	//	PRINT_THREE(3, "Test Point", "3");
 
 	EnterCriticalSection(&connServ.socketListCriticalSection);
 	SocketList::iterator iterSL = connServ.socketList->find(destinationCode);
@@ -1210,6 +1228,10 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 	}
 	RQ_Handler rqHandler = iterSL->second;
 	LeaveCriticalSection(&connServ.socketListCriticalSection);
+
+	//if (serviceType == 1)
+	//	PRINT_THREE(3, "Test Point", "4");
+
 	rioBuf->srcType = (SrcDstType)serviceType;
 	rioBuf->socketContext = destinationCode;
 
@@ -1232,6 +1254,9 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 		return false;
 	}
 	LeaveCriticalSection(&rqHandler.criticalSection);
+
+	//if (serviceType == 1)
+	//	PRINT_THREE(3, "Test Point", "5");
 
 	if (result == false) {
 
@@ -1299,8 +1324,7 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(typeCode);
 	if (iter == serviceList.end()) {
-
-		//PRINT_THREE(1, "ERROR", "Can't find service #" + to_string(typeCode));
+		//PRINT_THREE(1, "ERROR", "Close Service Entry: Can't find service #" + to_string(typeCode));
 		LeaveCriticalSection(&serviceListCriticalSection);
 		return -1;		//Service doesn't exist
 	}
@@ -1313,12 +1337,11 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 	EnterCriticalSection(&connectionServerService->socketListCriticalSection);
 	SocketList::iterator sockIter = sockList->find(socketContext);
 	if (sockIter == sockList->end()) {
-		//PRINT_THREE(1, "ERROR", "Service #" + to_string(typeCode), "Can't find entry #" + to_string(socketContext));
+		//PRINT_THREE(1, "ERROR", "Service #" + to_string(typeCode), "Close Service Entry: Can't find entry #" + to_string(socketContext));
 		LeaveCriticalSection(&connectionServerService->socketListCriticalSection);
 		return -2;		//Service doesn't exist
 	}
 	LeaveCriticalSection(&connectionServerService->socketListCriticalSection);
-
 
 	PRINT_THREE(1, "Service #" + to_string(typeCode), "Closing connection with entry #" + to_string(socketContext));
 
