@@ -6,6 +6,15 @@
 
 //#define		TRACK_MESSAGES
 
+#ifdef _DEBUG
+#define PRINT(x, y)		EnterCriticalSection(&consoleCriticalSection);	\
+						cout << x << y << endl;							\
+						LeaveCriticalSection(&consoleCriticalSection)
+#else
+#define PRINT(x, y)
+#endif // _DEBUG
+
+
 CRITICAL_SECTION consoleCriticalSection;
 
 struct BasicConnectionServerHandles {
@@ -22,15 +31,23 @@ int _tmain(int argc, _TCHAR* argv[])
 	//				Setup/Config
 	//##########################################
 
+	if (InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, 4000) == 0) {
+		// Error Exit - can't make console critical section
+		return 0;
+	}
+
 	string configFileLocation = "C:\\RIOConfig\\config.txt";
 
-	cout << "\nReading configuration data from: " << configFileLocation << endl;
+	PRINT("\nReading configuration data from: ", configFileLocation);
 
 	std::vector<std::thread*> threadPool;
 	std::vector<ServiceData> services;
 	RIOMainConfig rioMainConfig;
 	ConfigurationManager* configManager = new ConfigurationManager();
 	BasicConnectionServerHandles connectionServer;
+
+
+	connectionServer.rioManager.AssignConsoleCriticalSection(consoleCriticalSection);
 
 
 	//Load configuration from file
@@ -47,14 +64,6 @@ int _tmain(int argc, _TCHAR* argv[])
 		configManager = nullptr;
 	}
 
-	//For error message console printing, we are creating a critical section to prevent multi-threads
-	//from printing at the same time
-	if (InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, rioMainConfig.spinCount) == 0) {
-		// Error Exit - can't make console critical section
-		return 0;
-	}
-	connectionServer.rioManager.AssignConsoleCriticalSection(consoleCriticalSection);
-
 
 	//Calculate the number of buffers required to handle all services and the maximum CQ size
 	DWORD numberBuffersRequired = 0;
@@ -66,8 +75,8 @@ int _tmain(int argc, _TCHAR* argv[])
 				(serviceData.serviceRQMaxReceives + serviceData.serviceRQMaxSends));
 	}
 	maximumCQSize = (int)min(numberBuffersRequired, (DWORD)RIO_MAX_CQ_SIZE);
-	cout << "\nRequired number of buffers: \t" << numberBuffersRequired << endl;
-	cout << "Maximum CQ size: \t\t" << maximumCQSize << endl;
+	PRINT("\nRequired number of buffers: \t", numberBuffersRequired);
+	PRINT("Maximum CQ size: \t\t", maximumCQSize);
 
 
 	//Initialize the RIO Manager and create our IOCP and CQ
@@ -158,11 +167,6 @@ int _tmain(int argc, _TCHAR* argv[])
 						PostQueuedCompletionStatus(connectionServer.iocp, 0, CK_BUFINFO, &ov);
 						break;
 
-					case VK_NUMPAD4:
-						cout << "Numpad #4 Pressed. . . requesting critical section check. . ." << endl;
-						PostQueuedCompletionStatus(connectionServer.iocp, 0, CK_CHECKCRITSEC, &ov);
-						break;
-
 					default:
 						cout << "Some other key pressed" << endl;
 						break;
@@ -220,10 +224,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 		//##########################################
 
 		if (!GetQueuedCompletionStatus(connectionServer->iocp, &bytes, &key, (OVERLAPPED**)&extendedOverlapped, INFINITE)) {
-			//ERROR
-			EnterCriticalSection(&consoleCriticalSection);
-			cout << "ERROR: Could not call GQCS. . ." << endl;
-			LeaveCriticalSection(&consoleCriticalSection);
+			PRINT("ERROR: Could not call GQCS. . .", " ");
 			break;
 		}
 
@@ -237,14 +238,10 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 			// Get RIO results
 			numResults = connectionServer->rioManager.GetCompletedResults(results, rioResults);
 			if (numResults == 0) {
-				EnterCriticalSection(&consoleCriticalSection);
-				cout << "ERROR: RIO Completion Queue found empty. . ." << endl;
-				LeaveCriticalSection(&consoleCriticalSection);
+				PRINT("ERROR: RIO Completion Queue found empty. . .", " ");
 			}
 			else if (numResults == RIO_CORRUPT_CQ) {
-				EnterCriticalSection(&consoleCriticalSection);
-				cout << "ERROR: RIO Completion Queue corrupted. . ." << endl;
-				LeaveCriticalSection(&consoleCriticalSection);
+				PRINT("ERROR: RIO Completion Queue corrupted. . .", " ");
 			}
 
 			// RIO Result processing
@@ -272,10 +269,6 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 
 				instructionSet = processManager.GetInstructions(result);
 
-				/*EnterCriticalSection(&consoleCriticalSection);
-				cout << "Received " << instructionSet->size() << " instructions." << endl;
-				LeaveCriticalSection(&consoleCriticalSection);*/
-
 				for each (auto instruction in *instructionSet)
 				{
 					if (instruction.type == FREEBUFFER) {
@@ -289,8 +282,6 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 
 
 		case CK_ACCEPT:
-			//cout << "Received Accept Completion." << endl;
-			//connectionServer->rioManager.ConfigureNewSocket(op);
 			connectionServer->rioManager.CreateRIOSocket(TCPConnection, extendedOverlapped->serviceType, extendedOverlapped->relevantSocket);
 			connectionServer->rioManager.ResetAcceptCall(extendedOverlapped);
 			break;
@@ -308,7 +299,6 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 
 
 		case CK_GETINFO:
-			//cout << "Received Info Request from Main Thread." << endl;
 			connectionServer->rioManager.PrintServiceInformation();
 			break;
 
@@ -326,13 +316,8 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 			break;
 
 
-		case CK_CHECKCRITSEC:
-			connectionServer->rioManager.CheckCriticalSections();
-			break;
-
-
 		default:
-			cout << "ERROR: Received erroneous message in IOCP queue" << endl;
+			PRINT("ERROR: Received erroneous message in IOCP queue", " ");
 			break;
 
 		} // switch((COMPLETION_KEY)key)

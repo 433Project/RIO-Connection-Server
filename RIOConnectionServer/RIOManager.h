@@ -9,6 +9,17 @@
 
 //#define PRINT_MESSAGES
 
+#ifdef _DEBUG
+#define PRINT_FOUR(a, b, c, d)		PrintMessageFormatter(a, b, c, d)
+#define PRINT_THREE(e, f, g)		PrintMessageFormatter(e, f, g)
+#define PRINT_WIN_ERROR(h, i, j)	PrintMessageFormatter(h, i, j);		\
+									PrintWindowsErrorMessage()
+#else
+#define PRINT_FOUR(a, b, c, d)
+#define PRINT_THREE(e, f, g)
+#define PRINT_WIN_ERROR(h, i, j)
+#endif // _DEBUG
+
 typedef deque<EXTENDED_OVERLAPPED> AcceptStructs;
 
 typedef std::unordered_map<int, RQ_Handler> SocketList;
@@ -108,7 +119,6 @@ public:
 	int RIONotifyIOCP(RIO_CQ  rioCQ);
 	void AssignConsoleCriticalSection(CRITICAL_SECTION critSec);
 
-	void CheckCriticalSections();
 	void PrintServiceInformation();
 	void PrintBufferUsageStatistics();
 
