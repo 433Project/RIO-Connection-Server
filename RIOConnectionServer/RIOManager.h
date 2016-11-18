@@ -54,8 +54,50 @@ struct ConnectionServerService
 
 	//Round-Robin Service
 	bool isAddressRequired;
-	CRITICAL_SECTION roundRobinCriticalSection;			//Critical Section for modifying roundRobinLocation
-	int roundRobinLocation;
+	volatile int roundRobinLocation;
+
+	ConnectionServerService() 
+	{
+
+	}
+
+	ConnectionServerService(int valuePort,
+		int valueMaxClients,
+		int valueServiceMaxAccepts,
+		int valueServiceRQMaxReceives,
+		int valueServiceRQMaxSends,
+		CQ_Handler valueReceiveCQ,
+		CQ_Handler valueSendCQ,
+		bool valueIsUDPService,
+		SOCKET valueListeningSocket,
+		LPFN_ACCEPTEX valueAcceptExFunction,
+		AcceptStructs valueAcceptStructs,
+		CRITICAL_SECTION valueSocketListCriticialSection,
+		SocketList* valueSocketList,
+		CRITICAL_SECTION valueUdpCriticialSection,
+		RIO_RQ valueUdpRQ,
+		bool valueIsAddressRequired,
+		CRITICAL_SECTION valueRoundRobinCriticalSection,
+		int valueRoundRobinLocation) 
+	{
+		port = valuePort;
+		maxClients = valueMaxClients;
+		serviceMaxAccepts = valueServiceMaxAccepts;
+		serviceRQMaxReceives = valueServiceRQMaxReceives;
+		serviceRQMaxSends = valueServiceRQMaxSends;
+		receiveCQ = valueReceiveCQ;
+		sendCQ = valueSendCQ;
+		isUDPService = valueIsUDPService;
+		listeningSocket = valueListeningSocket;
+		acceptExFunction = valueAcceptExFunction;
+		acceptStructs = valueAcceptStructs;
+		socketListCriticalSection = valueSocketListCriticialSection;
+		socketList = valueSocketList;
+		udpCriticalSection = valueUdpCriticialSection;
+		udpRQ = valueUdpRQ;
+		isAddressRequired = valueIsAddressRequired;
+		roundRobinLocation = valueRoundRobinLocation;
+	}
 };
 
 typedef std::unordered_map<DWORD, ConnectionServerService> ServiceList;
@@ -72,6 +114,7 @@ class RIOManager
 
 	CRITICAL_SECTION consoleCriticalSection;
 	CRITICAL_SECTION serviceListCriticalSection;
+	SRWLOCK serviceListSRWLock;
 	ServiceList serviceList;	//Keeps track of all generated services
 
 	

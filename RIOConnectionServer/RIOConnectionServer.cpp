@@ -114,7 +114,8 @@ int _tmain(int argc, _TCHAR* argv[])
 			serviceData.serviceMaxAccepts,
 			serviceData.serviceRQMaxReceives,
 			serviceData.serviceRQMaxSends,
-			serviceData.isAddressRequired) != 0) {
+			serviceData.isAddressRequired) != 0) 
+		{
 			// Error exit - error creating service
 			exit(0);
 		}
