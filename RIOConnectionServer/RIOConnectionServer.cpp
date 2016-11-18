@@ -119,6 +119,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	for (int i = 0; i < rioMainConfig.numThreads; i++)
 	{
 		std::thread* thread = new std::thread(MainProcess, &connectionServer, i);
+		if (thread == nullptr)
+		{
+			return 0;
+		}
 		threadPool.emplace_back(thread);
 	}
 
@@ -200,9 +204,10 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 	//Initiate thread's variables and objects
 	ProcessManager processManager;
 	RIORESULT rioResults[1000];					//Maximum rio result load off per RIODequeueCompletion call
-	std::vector<EXTENDED_RIO_BUF*> results;		//Vector of Extended_RIO_BUF structs to give process manager
+	std::vector<ExtendedRioBuf*> results;		//Vector of Extended_RIO_BUF structs to give process manager
+	std::vector<Instruction>* instructionSet;
+	ExtendedOverlapped* extendedOverlapped = 0;
 	//std::vector<Instruction>* instructionSet;
-	EXTENDED_OVERLAPPED* extendedOverlapped = 0;
 	DWORD bytes = 0;
 	ULONG_PTR key = 0;
 	BOOL quitTrigger = false;
