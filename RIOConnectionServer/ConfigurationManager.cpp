@@ -28,7 +28,8 @@ ConfigurationManager::~ConfigurationManager()
 int ConfigurationManager::LoadConfiguration(string filename, RIOMainConfig* rioMainConfig, std::vector<ServiceData>* services) {
 	ifstream file (filename);	//Open the specified file
 
-	if (!file.is_open()) {
+	if (!file.is_open()) 
+	{
 		cout << "ERROR - Unable to open specified configuration file." << endl;
 		return -1;
 	}
@@ -39,7 +40,8 @@ int ConfigurationManager::LoadConfiguration(string filename, RIOMainConfig* rioM
 	ServiceData* serviceData = new ServiceData();
 
 	//Read through each line of the file and extract information
-	while (getline(file, s)) {
+	while (getline(file, s)) 
+	{
 
 		// ####################################
 		// LOGIC FOR EXTRACTING KEY/VALUE PAIRS
@@ -47,11 +49,13 @@ int ConfigurationManager::LoadConfiguration(string filename, RIOMainConfig* rioM
 
 		string::size_type begin = s.find_first_not_of(" \f\t\v");
 
-		if (begin == string::npos) {	//Skip line if blank
+		if (begin == string::npos) 
+		{	//Skip line if blank
 			continue;
 		}
 
-		if (string("#;").find(s[begin]) != string::npos) {	//Skip comment lines
+		if (string("#;").find(s[begin]) != string::npos) 
+		{	//Skip comment lines
 			continue;
 		}
 
@@ -61,7 +65,8 @@ int ConfigurationManager::LoadConfiguration(string filename, RIOMainConfig* rioM
 
 		key.erase(key.find_last_not_of(" \f\t\v") + 1);
 
-		if (key.empty()) {
+		if (key.empty()) 
+		{
 			continue;
 		}
 
@@ -71,10 +76,12 @@ int ConfigurationManager::LoadConfiguration(string filename, RIOMainConfig* rioM
 
 		value = s.substr(begin, end - begin);
 
-		if (value.empty()) {
+		if (value.empty()) 
+		{
 			valueConverted = 0;
 		}
-		else {
+		else 
+		{
 			valueConverted = atoi(value.c_str());
 		}
 
@@ -82,11 +89,13 @@ int ConfigurationManager::LoadConfiguration(string filename, RIOMainConfig* rioM
 		// LOGIC FOR INTERPRETING KEY/VALUE PAIRS
 		// ######################################
 
-		if (configMap.find(key) == configMap.end()) {
+		if (configMap.find(key) == configMap.end()) 
+		{
 			continue;
 		}
 
-		switch (configMap.find(key)->second) {
+		switch (configMap.find(key)->second) 
+		{
 
 		case BUFFER_SIZE:
 			rioMainConfig->bufferSize = valueConverted;
@@ -105,7 +114,8 @@ int ConfigurationManager::LoadConfiguration(string filename, RIOMainConfig* rioM
 			break;
 
 		case NEW_SERVICE:
-			if (serviceCount > 0) {
+			if (serviceCount > 0) 
+			{
 				services->push_back(*serviceData);
 			}
 			serviceCount++;
@@ -141,10 +151,12 @@ int ConfigurationManager::LoadConfiguration(string filename, RIOMainConfig* rioM
 			break;
 
 		case SERVICE_ADDRESS_REQUIRED:
-			if (valueConverted == 1) {
+			if (valueConverted == 1) 
+			{
 				serviceData->isAddressRequired = true;
 			}
-			else {
+			else 
+			{
 				serviceData->isAddressRequired = false;
 			}
 			break;

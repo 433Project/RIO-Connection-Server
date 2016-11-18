@@ -27,7 +27,8 @@ typedef deque<ExtendedOverlapped> AcceptStructs;
 
 typedef std::unordered_map<int, RQ_Handler> SocketList;
 
-struct ConnectionServerService {
+struct ConnectionServerService 
+{
 	//Main components
 	int port;
 	int maxClients;

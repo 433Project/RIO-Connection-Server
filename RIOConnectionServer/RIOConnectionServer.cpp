@@ -17,7 +17,8 @@
 
 CRITICAL_SECTION consoleCriticalSection;
 
-struct BasicConnectionServerHandles {
+struct BasicConnectionServerHandles 
+{
 	RIOManager rioManager;
 	HANDLE iocp;
 	CQ_Handler cqHandler;
@@ -31,7 +32,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	//				Setup/Config
 	//##########################################
 
-	if (InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, 4000) == 0) {
+	if (InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, 4000) == 0) 
+	{
 		// Error Exit - can't make console critical section
 		exit(0);
 	}
@@ -51,11 +53,13 @@ int _tmain(int argc, _TCHAR* argv[])
 
 
 	//Load configuration from file
-	if (configManager.LoadConfiguration(configFileLocation, &rioMainConfig, &services) != 0) {
+	if (configManager.LoadConfiguration(configFileLocation, &rioMainConfig, &services) != 0) 
+	{
 		// Error exit - could not load configuration file
 		exit(0);
 	}
-	if (services.empty()) {
+	if (services.empty()) 
+	{
 		// Error Exit - no services specified
 		exit(0);
 	}
@@ -79,17 +83,20 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (connectionServer.rioManager.InitializeRIO(rioMainConfig.bufferSize,
 		numberBuffersRequired,
 		rioMainConfig.spinCount,
-		rioMainConfig.dequeueCount) != 0) {
+		rioMainConfig.dequeueCount) != 0) 
+	{
 		// Error exit - can't initialize RIO
 		exit(0);
 	}
 	connectionServer.iocp = connectionServer.rioManager.CreateIOCP();
-	if (connectionServer.iocp == INVALID_HANDLE_VALUE) {
+	if (connectionServer.iocp == INVALID_HANDLE_VALUE) 
+	{
 		// Error exit - couldn't make IOCP
 		exit(0);
 	}
 	CQ_Handler cqHandler = connectionServer.rioManager.CreateCQ(maximumCQSize);
-	if (cqHandler.rio_CQ == RIO_INVALID_CQ) {
+	if (cqHandler.rio_CQ == RIO_INVALID_CQ) 
+	{
 		// Error exit - couldn't make CQ
 		exit(0);
 	}
@@ -138,11 +145,14 @@ int _tmain(int argc, _TCHAR* argv[])
 		GetConsoleMode(consoleHandle, &mode);
 		SetConsoleMode(consoleHandle, 0);
 
-		while (isRunning) {
-			if (WaitForSingleObject(consoleHandle, INFINITE) == WAIT_OBJECT_0) {
+		while (isRunning) 
+		{
+			if (WaitForSingleObject(consoleHandle, INFINITE) == WAIT_OBJECT_0) 
+			{
 				ReadConsoleInput(consoleHandle, &inputEvent, 1, &inputCount);
 
-				if ((inputEvent.EventType == KEY_EVENT) && !inputEvent.Event.KeyEvent.bKeyDown) {
+				if ((inputEvent.EventType == KEY_EVENT) && !inputEvent.Event.KeyEvent.bKeyDown)
+				{
 					switch (inputEvent.Event.KeyEvent.wVirtualKeyCode)
 					{
 
@@ -186,7 +196,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	//Wait for threads to exit
 	for each(auto thread in threadPool)
 	{
-		if (thread != nullptr) {
+		if (thread != nullptr) 
+		{
 			thread->join();
 			delete thread;
 		}
@@ -226,7 +237,8 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 		//		Get Queued Completion Status
 		//##########################################
 
-		if (!GetQueuedCompletionStatus(connectionServer->iocp, &bytes, &key, (OVERLAPPED**)&extendedOverlapped, INFINITE)) {
+		if (!GetQueuedCompletionStatus(connectionServer->iocp, &bytes, &key, (OVERLAPPED**)&extendedOverlapped, INFINITE)) 
+		{
 			PRINT("ERROR: Could not call GQCS. . .", " ");
 			break;
 		}
@@ -235,15 +247,18 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 		//		Completion Key Demultiplexing
 		//##########################################
 
-		switch ((COMPLETION_KEY)key) {
+		switch ((COMPLETION_KEY)key) 
+		{
 
 		case CK_RIO:
 			// Get RIO results
 			numResults = connectionServer->rioManager.GetCompletedResults(results, rioResults);
-			if (numResults == 0) {
+			if (numResults == 0) 
+			{
 				PRINT("ERROR: RIO Completion Queue found empty. . .", " ");
 			}
-			else if (numResults == RIO_CORRUPT_CQ) {
+			else if (numResults == RIO_CORRUPT_CQ) 
+			{
 				PRINT("ERROR: RIO Completion Queue corrupted. . .", " ");
 			}
 
@@ -255,18 +270,22 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 				cout << "\nMessage came from service #" << result->srcType << endl;
 				cout << "Message came from RQ #" << result->socketContext << endl;
 				cout << "Completion was type " << result->operationType << endl;
-				if (result->operationType == OP_SEND) {
+				if (result->operationType == OP_SEND) 
+				{
 					cout << "OP_SEND" << endl;
 				}
-				else if (result->operationType == OP_RECEIVE) {
+				else if (result->operationType == OP_RECEIVE) 
+				{
 					cout << "OP_RECEIVE" << endl;
 				}
 				LeaveCriticalSection(&consoleCriticalSection);
 #endif // TRACK_MESSAGES
-				if (result->operationType == OP_RECEIVE) {
+				if (result->operationType == OP_RECEIVE) 
+				{
 					receiveCount++;
 				}
-				else if (result->operationType == OP_SEND) {
+				else if (result->operationType == OP_SEND) 
+				{
 					sendCount++;
 				}
 
@@ -274,7 +293,8 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 
 				for each (auto instruction in *instructionSet)
 				{
-					if (instruction.type == FREEBUFFER) {
+					if (instruction.type == FREEBUFFER) 
+					{
 						freeBufferCount++;
 					}
 					connectionServer->rioManager.ProcessInstruction(instruction);
@@ -324,7 +344,8 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 
 		} // switch((COMPLETION_KEY)key)
 		
-		if (quitTrigger) {
+		if (quitTrigger) 
+		{
 			break;
 		}
 	} // while (true)

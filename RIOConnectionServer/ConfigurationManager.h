@@ -6,7 +6,8 @@
 #include <unordered_map>
 #include <string>
 
-enum CONFIGURATION_COMMANDS {
+enum CONFIGURATION_COMMANDS 
+{
 	BUFFER_SIZE = 0,
 	DEQUEUE_COUNT,
 	NUM_THREADS,
