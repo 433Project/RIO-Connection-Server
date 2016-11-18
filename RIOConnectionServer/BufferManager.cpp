@@ -40,7 +40,7 @@ void BufferManager::Initialize(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable, D
 
 	for (int i = 0; i < totalBufferCount; i++)
 	{
-		EXTENDED_RIO_BUF* buffer = new EXTENDED_RIO_BUF();
+		ExtendedRioBuf* buffer = new ExtendedRioBuf();
 		buffer->BufferId = id;
 		buffer->buffer = newMemoryArea;
 		buffer->Offset = bufferSize * i;
@@ -53,7 +53,7 @@ void BufferManager::Initialize(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable, D
 	}
 }
 
-EXTENDED_RIO_BUF* BufferManager::GetBuffer()
+ExtendedRioBuf* BufferManager::GetBuffer()
 {
 	EnterCriticalSection(&bufferCriticalSection);
 	if (freeBufferIndex.size() <= 0)
@@ -77,7 +77,7 @@ EXTENDED_RIO_BUF* BufferManager::GetBuffer()
 	return bufferPool[index];
 }
 
-void BufferManager::FreeBuffer(EXTENDED_RIO_BUF* buffer)
+void BufferManager::FreeBuffer(ExtendedRioBuf* buffer)
 {
 	if (buffer == nullptr)
 	{

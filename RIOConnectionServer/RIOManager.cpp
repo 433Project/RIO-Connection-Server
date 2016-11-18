@@ -140,7 +140,7 @@ CQ_Handler RIOManager::CreateCQ(int size) {
 }
 
 ///This function creates a new RIO Socket of various types
-int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP,
+int RIOManager::CreateRIOSocket(SOCKET_TYPE socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP,
 	int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired) {
 
 	// ##################################
@@ -352,25 +352,25 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 //			10000, 10, 10000, 10000, false);
 //}
 //
-int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET relevantSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ) {
+int RIOManager::CreateRIOSocket(SOCKET_TYPE socketType, int serviceType, SOCKET relevantSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ) {
 	return CreateRIOSocket(socketType, serviceType, relevantSocket, 0, receiveCQ, sendCQ, GetMainIOCP(),
 		0, 0, 0, 0, false);
 }
 
 
-int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port,
+int RIOManager::CreateRIOSocket(SOCKET_TYPE socketType, int serviceType, int port,
 	int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired) {
 	SOCKET socket = INVALID_SOCKET;
 	return CreateRIOSocket(socketType, serviceType, port, socket, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP(),
 		serviceMaxClients, serviceMaxAccepts, serviceRQMaxReceives, serviceRQMaxSends, isAddressRequired);
 }
 
-int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket) {
+int RIOManager::CreateRIOSocket(SOCKET_TYPE socketType, int serviceType, SOCKET newSocket) {
 	return CreateRIOSocket(socketType, serviceType, 0, newSocket, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP(),
 		0, 0, 0, 0, false);
 }
 
-int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port) {
+int RIOManager::CreateRIOSocket(SOCKET_TYPE socketType, int serviceType, int port) {
 	SOCKET socket = INVALID_SOCKET;
 	return CreateRIOSocket(socketType, serviceType, port, socket, GetMainRIOCQ(), GetMainRIOCQ(), GetMainIOCP(),
 		0, 0, 0, 0, false);
@@ -398,7 +398,7 @@ int RIOManager::SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sen
 }
 
 ///This function gets the RIO results from a particular RIO CQ.
-int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler) {
+int RIOManager::GetCompletedResults(vector<ExtendedRioBuf*>& results, RIORESULT* rioResults, CQ_Handler cqHandler) {
 
 
 	//Enter critical section of the CQ we are trying to access
@@ -418,13 +418,13 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 	}
 
 
-	EXTENDED_RIO_BUF* tempRIOBuf;
+	ExtendedRioBuf* tempRIOBuf;
 	results.clear();					//Clear the thread's results list
 
 	
 	for (int i = 0; i < numResults; i++)
 	{
-		tempRIOBuf = reinterpret_cast<EXTENDED_RIO_BUF*>(rioResults[i].RequestContext);
+		tempRIOBuf = reinterpret_cast<ExtendedRioBuf*>(rioResults[i].RequestContext);
 		//Check rioresult structure for errors
 		//NOTE - Information on RIORESULT's Status values is unclear
 		//When a client/server force closes, error code 10054 is received (WSAECONNRESET - connection reset by pear)
@@ -485,7 +485,7 @@ int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESUL
 	return numResults;
 }
 
-int RIOManager::GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults) {
+int RIOManager::GetCompletedResults(vector<ExtendedRioBuf*>& results, RIORESULT* rioResults) {
 	return GetCompletedResults(results, rioResults, GetMainRIOCQ());
 }
 
@@ -688,7 +688,7 @@ int RIOManager::ProcessInstruction(Instruction instruction) {
 }
 
 ///This function processes an AcceptEx completion by creating a new RIOSocket with the appropriate settings.
-int RIOManager::NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped) {
+int RIOManager::NewConnection(ExtendedOverlapped* extendedOverlapped) {
 	CQ_Handler serviceCQs[2];
 
 	//Find the service entry
@@ -733,7 +733,7 @@ void RIOManager::AssignConsoleCriticalSection(CRITICAL_SECTION critSec) {
 	consoleCriticalSection = critSec;
 }
 
-int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
+int RIOManager::ConfigureNewSocket(ExtendedOverlapped* extendedOverlapped) {
 	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(extendedOverlapped->serviceType);
 	LeaveCriticalSection(&serviceListCriticalSection);
@@ -815,7 +815,7 @@ int RIOManager::ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped) {
 
 
 
-int RIOManager::ResetAcceptCall(EXTENDED_OVERLAPPED* extendedOverlapped) {
+int RIOManager::ResetAcceptCall(ExtendedOverlapped* extendedOverlapped) {
 
 	PRINT_THREE(3, "ResetAcceptCall", "Looking for Service #" + to_string(extendedOverlapped->serviceType));
 
@@ -1078,10 +1078,10 @@ int RIOManager::FillAcceptStructures(int typeCode, int numStruct) {
 	ConnectionServerService* service;
 	service = &iter->second;
 
-	EXTENDED_OVERLAPPED* exOver;
+	ExtendedOverlapped* exOver;
 
 	for (int i = 0; i < numStruct; i++) {
-		exOver = new EXTENDED_OVERLAPPED();
+		exOver = new ExtendedOverlapped();
 		exOver->serviceType = typeCode;
 		exOver->relevantSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_IP, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
 		if (exOver->relevantSocket == INVALID_SOCKET) {
@@ -1097,7 +1097,7 @@ int RIOManager::FillAcceptStructures(int typeCode, int numStruct) {
 }
 
 
-int RIOManager::BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped, LPFN_ACCEPTEX acceptExFunction) {
+int RIOManager::BeginAcceptEx(ExtendedOverlapped* extendedOverlapped, LPFN_ACCEPTEX acceptExFunction) {
 	//Needed for AcceptEx
 	DWORD bytes;
 
@@ -1145,7 +1145,7 @@ CQ_Handler RIOManager::GetMainRIOCQ() {
 
 bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 
-	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
+	ExtendedRioBuf* rioBuf = bufferManager.GetBuffer();
 	if (rioBuf == nullptr) {
 		PRINT_THREE(1, "ERROR", "Could not post receive. No Buffers available. UDP Service #" + to_string(serviceType));
 		return false;
@@ -1157,7 +1157,7 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 	ConnectionServerService connServ = iter->second;
 	LeaveCriticalSection(&serviceListCriticalSection);
 
-	rioBuf->srcType = (SrcDstType)serviceType;
+	rioBuf->srcType = (SRC_DEST_TYPE)serviceType;
 
 	bool result;
 
@@ -1188,7 +1188,7 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 		return false;
 	}
 	
-	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
+	ExtendedRioBuf* rioBuf = bufferManager.GetBuffer();
 	if (rioBuf == nullptr) {
 		PRINT_THREE(1, "ERROR", "Could not post receive. No Buffers available. TCP Service #" + to_string(serviceType));
 		PRINT_THREE(2, "DST CODE", to_string(destinationCode));
@@ -1212,7 +1212,7 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 	}
 	RQ_Handler rqHandler = iterSL->second;
 	LeaveCriticalSection(&connServ.socketListCriticalSection);
-	rioBuf->srcType = (SrcDstType)serviceType;
+	rioBuf->srcType = (SRC_DEST_TYPE)serviceType;
 	rioBuf->socketContext = destinationCode;
 
 	bool result;

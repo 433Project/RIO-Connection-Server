@@ -2,28 +2,28 @@
 #include "definitions.h"
 #include <vector>
 
-struct EXTENDED_RIO_BUF;
+struct ExtendedRioBuf;
 
 
 struct AddressInfo
 {
-	SrcDstType srcType;
+	SRC_DEST_TYPE srcType;
 	int srcCode;
-	SrcDstType dstType;
+	SRC_DEST_TYPE dstType;
 	int dstCode;
 };
 
 class ProcessManager
 {
 public:
-	std::vector<Instruction>*GetInstructions(EXTENDED_RIO_BUF* data);
+	std::vector<Instruction>*GetInstructions(ExtendedRioBuf* data);
 
 	ProcessManager();
 	~ProcessManager();
 
 private:
 
-	AddressInfo GetManagedInfo(AddressInfo receivedInfo, const EXTENDED_RIO_BUF& data);
+	AddressInfo GetManagedInfo(AddressInfo receivedInfo, const ExtendedRioBuf& data);
 
 private:
 	int matchingServerCount;

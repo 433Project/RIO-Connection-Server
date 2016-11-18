@@ -113,7 +113,7 @@ int ConfigurationManager::LoadConfiguration(string filename, RIOMainConfig* rioM
 			break;
 
 		case SERVICE_TYPE:
-			serviceData->serviceType = (SocketType)valueConverted;
+			serviceData->serviceType = (SOCKET_TYPE)valueConverted;
 			break;
 
 		case SERVICE_CODE:

@@ -3,7 +3,7 @@
 #include "RIOManager.h"
 
 
-std::vector<Instruction>* ProcessManager::GetInstructions(EXTENDED_RIO_BUF* data)
+std::vector<Instruction>* ProcessManager::GetInstructions(ExtendedRioBuf* data)
 {
 	std::vector<Instruction>* instructions = new std::vector<Instruction>();
 	switch (data->operationType)
@@ -75,7 +75,7 @@ ProcessManager::~ProcessManager()
 {
 }
 
-AddressInfo ProcessManager::GetManagedInfo(AddressInfo receivedInfo, const EXTENDED_RIO_BUF& data)
+AddressInfo ProcessManager::GetManagedInfo(AddressInfo receivedInfo, const ExtendedRioBuf& data)
 {
 	AddressInfo result;
 	if(matchingServerCount > 3)

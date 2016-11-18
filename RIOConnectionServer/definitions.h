@@ -1,7 +1,8 @@
 #pragma once
 #include "stdafx.h"
 
-enum SocketType {
+enum SOCKET_TYPE 
+{
 	UDPSocket,
 	TCPListener,
 	TCPConnection,
@@ -9,19 +10,22 @@ enum SocketType {
 	TCPServer
 };
 
-enum InstructionType {
+enum INSTRUCTION_TYPE
+{
 	SEND,
 	RECEIVE,
 	CLOSESOCKET,
 	FREEBUFFER
 };
 
-enum OperationType {
+enum OPERATION_TYPE 
+{
 	OP_RECEIVE,
 	OP_SEND
 };
 
-enum COMPLETION_KEY {
+enum COMPLETION_KEY 
+{
 	CK_QUIT,
 	CK_RIO,
 	CK_ACCEPT,
@@ -29,7 +33,7 @@ enum COMPLETION_KEY {
 	CK_COUNTER,
 	CK_BUFINFO
 };
-enum SrcDstType
+enum SRC_DEST_TYPE
 {
 	MATCHING_SERVER = 0,
 	MATCHING_CLIENT,
@@ -40,7 +44,7 @@ enum SrcDstType
 	CONNECTION_SERVER
 };
 
-enum Command
+enum COMMAND
 {
 	//Common
 	HEALTH_CHECK = 0,
@@ -65,7 +69,7 @@ enum Command
 	GAME_END
 };
 
-enum Status : int
+enum STATUS : int
 {
 	SUCCESS,
 	FAIL,
@@ -75,20 +79,23 @@ enum Status : int
 
 struct Body
 {
-	Command command;
-	Status status;
+	COMMAND command;
+	STATUS status;
 	char* data;
 };
 
 
-struct EXTENDED_OVERLAPPED : public OVERLAPPED {
+struct ExtendedOverlapped : public OVERLAPPED 
+{
 	int serviceType;
 	SOCKET relevantSocket;
 	char* buffer = new char[(2*(sizeof(sockaddr_in))+32)];
 };
 
-struct CQ_Handler {
-	CQ_Handler() {
+struct CQ_Handler 
+{
+	CQ_Handler() 
+	{
 		rio_CQ = RIO_INVALID_CQ;
 	}
 
@@ -96,39 +103,43 @@ struct CQ_Handler {
 	CRITICAL_SECTION criticalSection;
 };
 
-struct RQ_Handler {
+struct RQ_Handler 
+{
 	RIO_RQ rio_RQ;
 	SOCKET socket;
 	CRITICAL_SECTION criticalSection;
 };
 
 
-struct EXTENDED_RIO_BUF : public RIO_BUF
+struct ExtendedRioBuf : public RIO_BUF
 {
-	OperationType operationType;
-	SrcDstType srcType;
+	OPERATION_TYPE operationType;
+	SRC_DEST_TYPE srcType;
 	int socketContext;
 	char* buffer;
 	int messageLength;
 
 };
 
-struct Instruction {
-	InstructionType type;
+struct Instruction 
+{
+	INSTRUCTION_TYPE type;
 	int socketContext;		//Destination Code
-	SrcDstType destinationType;
-	EXTENDED_RIO_BUF* buffer;
+	SRC_DEST_TYPE destinationType;
+	ExtendedRioBuf* buffer;
 };
 
-struct RIOMainConfig {
+struct RIOMainConfig 
+{
 	int bufferSize;
 	int dequeueCount;
 	int numThreads;
 	int spinCount;
 };
 
-struct ServiceData {
-	SocketType serviceType;
+struct ServiceData 
+{
+	SOCKET_TYPE serviceType;
 	int serviceCode;
 	int servicePort;
 	int serviceMaxClients;
@@ -137,11 +148,13 @@ struct ServiceData {
 	int serviceRQMaxSends;
 	bool isAddressRequired;
 
-	ServiceData() {
+	ServiceData() 
+	{
 
 	}
 
-	ServiceData(SocketType servType, int code, int port) {
+	ServiceData(SOCKET_TYPE servType, int code, int port) 
+	{
 		serviceType = servType;
 		serviceCode = code;
 		servicePort = port;

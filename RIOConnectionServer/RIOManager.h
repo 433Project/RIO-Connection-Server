@@ -20,7 +20,7 @@
 #define PRINT_WIN_ERROR(h, i, j)
 #endif // _DEBUG
 
-typedef deque<EXTENDED_OVERLAPPED> AcceptStructs;
+typedef deque<ExtendedOverlapped> AcceptStructs;
 
 typedef std::unordered_map<int, RQ_Handler> SocketList;
 
@@ -64,7 +64,7 @@ class RIOManager
 {
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctions; 
 	BufferManager bufferManager;
-	EXTENDED_OVERLAPPED mainExtendedOverlapped;
+	ExtendedOverlapped mainExtendedOverlapped;
 
 	CRITICAL_SECTION consoleCriticalSection;
 	CRITICAL_SECTION serviceListCriticalSection;
@@ -96,25 +96,25 @@ public:
 	CQ_Handler CreateCQ(int size, HANDLE hIOCP);									//Create CQ with IOCP Queue specified (For creating main-CQ in Multi-IOCP system)
 	CQ_Handler CreateCQ(int size);													//Default (For creating main-CQ for main-IOCP queue)
 	//Overloaded Series of Functions to Create a new RIO Socket of various types
-	int CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP,
+	int CreateRIOSocket(SOCKET_TYPE socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP,
 						int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired);	//Any Type of Socket
 	//int CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP);	//Any Type of Socket 
-	int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ);							//TCP Client or Server with CQs specified
-	int CreateRIOSocket(SocketType socketType, int serviceType, int port, 
+	int CreateRIOSocket(SOCKET_TYPE socketType, int serviceType, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ);							//TCP Client or Server with CQs specified
+	int CreateRIOSocket(SOCKET_TYPE socketType, int serviceType, int port, 
 		int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired);
-	int CreateRIOSocket(SocketType socketType, int serviceType, SOCKET newSocket);							//TCP Client or Server with CQs specified
-	int CreateRIOSocket(SocketType socketType, int serviceType, int port); //UDP Service with defaults or TCP listener with defaults
+	int CreateRIOSocket(SOCKET_TYPE socketType, int serviceType, SOCKET newSocket);							//TCP Client or Server with CQs specified
+	int CreateRIOSocket(SOCKET_TYPE socketType, int serviceType, int port); //UDP Service with defaults or TCP listener with defaults
 
 	int SetServiceCQs(int typeCode, CQ_Handler receiveCQ, CQ_Handler sendCQ);
 
-	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults, CQ_Handler cqHandler);
-	int GetCompletedResults(vector<EXTENDED_RIO_BUF*>& results, RIORESULT* rioResults);
+	int GetCompletedResults(vector<ExtendedRioBuf*>& results, RIORESULT* rioResults, CQ_Handler cqHandler);
+	int GetCompletedResults(vector<ExtendedRioBuf*>& results, RIORESULT* rioResults);
 	int ProcessInstruction(Instruction instruction);
 
-	int ConfigureNewSocket(EXTENDED_OVERLAPPED* extendedOverlapped);
-	int ResetAcceptCall(EXTENDED_OVERLAPPED* extendedOverlapped);
+	int ConfigureNewSocket(ExtendedOverlapped* extendedOverlapped);
+	int ResetAcceptCall(ExtendedOverlapped* extendedOverlapped);
 
-	int NewConnection(EXTENDED_OVERLAPPED* extendedOverlapped);
+	int NewConnection(ExtendedOverlapped* extendedOverlapped);
 
 	int RIONotifyIOCP(RIO_CQ  rioCQ);
 	void AssignConsoleCriticalSection(CRITICAL_SECTION critSec);
@@ -136,7 +136,7 @@ private:
 
 	//Initiator functions
 	int FillAcceptStructures(int typeCode, int numStruct);
-	int BeginAcceptEx(EXTENDED_OVERLAPPED* extendedOverlapped, LPFN_ACCEPTEX acceptExFunction);
+	int BeginAcceptEx(ExtendedOverlapped* extendedOverlapped, LPFN_ACCEPTEX acceptExFunction);
 	bool PostReceiveOnUDPService(int serviceType);
 	bool PostReceiveOnTCPService(int serviceType, int destinationCode);
 
