@@ -5,6 +5,7 @@
 RIOManager::RIOManager()
 {
 	socketRIO = INVALID_SOCKET;
+	span s(mySeries, _T("Thread Blocking Finder"));
 }
 
 ///This function loads WinSock and initiates the RIOManager basic needs such as registered buffers.
@@ -337,9 +338,12 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 				return -8;
 			}
 			for (int y = 0; y < serviceRQMaxReceives; y++) {
-				if (!PostReceiveOnUDPService(serviceType)) {
-					PRINT_WIN_ERROR(2, "ERROR", "Failed to Post Receive on new UDP service.");
+				if (!PostReceiveOnUDPService(serviceType, RIO_MSG_DEFER)) {
+					PRINT_WIN_ERROR(2, "ERROR", "Failed to Post initial Receive on new UDP service.");
 				}
+			}
+			if (!rioFunctions.RIOReceive(rio_RQ, NULL, 0, RIO_MSG_COMMIT_ONLY, NULL)) {
+				PRINT_WIN_ERROR(2, "ERROR", "Failed to commit initial receives on new UDP service.");
 			}
 		}
 		else {
@@ -349,10 +353,13 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 				return -9;
 			}
 			PRINT_THREE(2, "Post TCP", "Positing initial TCP receives. . .");
-			for (int y = 0; y < serviceRQMaxReceives; y++) {
-				if (!PostReceiveOnTCPService(serviceType, (int)newSocket)) {
+			for (int y = 0; y < (serviceRQMaxReceives); y++) {
+				if (!PostReceiveOnTCPService(serviceType, (int)newSocket, RIO_MSG_DEFER)) {
 					PRINT_WIN_ERROR(2, "ERROR", "Failed to Post Receive on new TCP entry.");
 				}
+			}
+			if (!rioFunctions.RIOReceive(rio_RQ, NULL, 0, RIO_MSG_COMMIT_ONLY, NULL)) {
+				PRINT_WIN_ERROR(2, "ERROR", "Failed to commit initial receives on new TCP entry.");
 			}
 		}
 	}
@@ -362,16 +369,11 @@ int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port
 	return 0;
 }
 
-//int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port, SOCKET newSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ, HANDLE hIOCP) {
-//	return CreateRIOSocket(socketType, serviceType, newSocket, 0, receiveCQ, sendCQ, GetMainIOCP(),
-//			10000, 10, 10000, 10000, false);
-//}
-//
+
 int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, SOCKET relevantSocket, CQ_Handler receiveCQ, CQ_Handler sendCQ) {
 	return CreateRIOSocket(socketType, serviceType, relevantSocket, 0, receiveCQ, sendCQ, GetMainIOCP(),
 		0, 0, 0, 0, false);
 }
-
 
 int RIOManager::CreateRIOSocket(SocketType socketType, int serviceType, int port,
 	int serviceMaxClients, int serviceMaxAccepts, int serviceRQMaxReceives, int serviceRQMaxSends, bool isAddressRequired) {
@@ -1150,7 +1152,7 @@ CQ_Handler RIOManager::GetMainRIOCQ() {
 
 
 
-bool RIOManager::PostReceiveOnUDPService(int serviceType) {
+bool RIOManager::PostReceiveOnUDPService(int serviceType, DWORD flags) {
 
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
 	if (rioBuf == nullptr) {
@@ -1158,25 +1160,19 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 		return false;
 	}
 
-	rioBuf->operationType = OP_RECEIVE;
 	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
 	LeaveCriticalSection(&serviceListCriticalSection);
 
-	rioBuf->srcType = (SrcDstType)serviceType;
-
 	bool result;
 
+	rioBuf->operationType = OP_RECEIVE;
+	rioBuf->srcType = (SrcDstType)serviceType;
+
 	EnterCriticalSection(&connServ.udpCriticalSection);
-	try {
-		result = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, 0, rioBuf);
-	}
-	catch (const std::exception &e) {
-		PRINT_WIN_ERROR(1, "ERROR", "Could not post receive. No Buffers available. UDP Service #" + to_string(serviceType));
-		LeaveCriticalSection(&connServ.udpCriticalSection);
-		return false;
-	}
+	mySeries.write_flag(_T("RIOReceive"));
+	result = rioFunctions.RIOReceive(connServ.udpRQ, rioBuf, 1, flags, rioBuf);
 	LeaveCriticalSection(&connServ.udpCriticalSection);
 	
 	if (result == false) {
@@ -1186,17 +1182,18 @@ bool RIOManager::PostReceiveOnUDPService(int serviceType) {
 	return result;
 }
 
+bool RIOManager::PostReceiveOnUDPService(int serviceType) {
+	return PostReceiveOnUDPService(serviceType, 0);
+}
 
 
-bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
+
+bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode, DWORD flags) {
 
 	if (destinationCode == 0) {
 		PRINT_THREE(1, "ERROR", "Could not post receive. Erroneous destination code on TCP Service of value #" + to_string(serviceType));
 		return false;
 	}
-
-	//if (serviceType == 1)
-	//	PRINT_THREE(3, "Test Point", "1");
 	
 	EXTENDED_RIO_BUF* rioBuf = bufferManager.GetBuffer();
 	if (rioBuf == nullptr) {
@@ -1205,17 +1202,10 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 		return false;
 	}
 
-	//if (serviceType == 1)
-	//	PRINT_THREE(3, "Test Point", "2");
-
-	rioBuf->operationType = OP_RECEIVE;
 	EnterCriticalSection(&serviceListCriticalSection);
 	ServiceList::iterator iter = serviceList.find(serviceType);
 	ConnectionServerService connServ = iter->second;
 	LeaveCriticalSection(&serviceListCriticalSection);
-
-	//if (serviceType == 1)
-	//	PRINT_THREE(3, "Test Point", "3");
 
 	EnterCriticalSection(&connServ.socketListCriticalSection);
 	SocketList::iterator iterSL = connServ.socketList->find(destinationCode);
@@ -1224,14 +1214,13 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 		PRINT_THREE(1, "ERROR", "Post Receive Fail. Entry no longer exists on TCP Service #" + to_string(serviceType));
 		PRINT_THREE(2, "DST CODE", to_string(destinationCode));
 		LeaveCriticalSection(&connServ.socketListCriticalSection);
+		bufferManager.FreeBuffer(rioBuf);
 		return false;
 	}
 	RQ_Handler rqHandler = iterSL->second;
 	LeaveCriticalSection(&connServ.socketListCriticalSection);
 
-	//if (serviceType == 1)
-	//	PRINT_THREE(3, "Test Point", "4");
-
+	rioBuf->operationType = OP_RECEIVE;
 	rioBuf->srcType = (SrcDstType)serviceType;
 	rioBuf->socketContext = destinationCode;
 
@@ -1240,30 +1229,24 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
 	if (rqHandler.rio_RQ == RIO_INVALID_RQ || rqHandler.socket == INVALID_SOCKET) {
 		PRINT_THREE(1, "ERROR", "Post Receive Fail. Entry exists, but RQ or Socket invalid on TCP Service #" + to_string(serviceType));
 		PRINT_THREE(2, "DST CODE", to_string(destinationCode));
+		bufferManager.FreeBuffer(rioBuf);
 		return false;
 	}
 
 	EnterCriticalSection(&rqHandler.criticalSection);
-	try {
-		result = rioFunctions.RIOReceive(rqHandler.rio_RQ, rioBuf, 1, 0, rioBuf);
-	}
-	catch (const std::exception &e) {
-		PRINT_WIN_ERROR(1, "ERROR", "Could not post receive. No Buffers available. TCP Service #" + to_string(serviceType));
-		PRINT_THREE(2, "DST CODE", to_string(destinationCode));
-		LeaveCriticalSection(&rqHandler.criticalSection);
-		return false;
-	}
+	mySeries.write_flag(_T("RIOReceive"));
+	result = rioFunctions.RIOReceive(rqHandler.rio_RQ, rioBuf, 1, flags, rioBuf);
 	LeaveCriticalSection(&rqHandler.criticalSection);
 
-	//if (serviceType == 1)
-	//	PRINT_THREE(3, "Test Point", "5");
-
 	if (result == false) {
-
 		bufferManager.FreeBuffer(rioBuf);
 	}
 
 	return result;
+}
+
+bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode) {
+	return PostReceiveOnTCPService(serviceType, destinationCode, 0);
 }
 
 
@@ -1341,11 +1324,11 @@ int RIOManager::CloseServiceEntry(int typeCode, int socketContext) {
 		LeaveCriticalSection(&connectionServerService->socketListCriticalSection);
 		return -2;		//Service doesn't exist
 	}
+	rqHandler = &sockIter->second;
 	LeaveCriticalSection(&connectionServerService->socketListCriticalSection);
 
 	PRINT_THREE(1, "Service #" + to_string(typeCode), "Closing connection with entry #" + to_string(socketContext));
 
-	rqHandler = &sockIter->second;
 	EnterCriticalSection(&rqHandler->criticalSection);
 	closesocket(rqHandler->socket);
 	LeaveCriticalSection(&rqHandler->criticalSection);

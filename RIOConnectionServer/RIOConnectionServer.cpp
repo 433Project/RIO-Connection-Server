@@ -275,15 +275,12 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 					connectionServer->rioManager.ProcessInstruction(instruction);
 				}
 			}
-
 			break;
 
 
 		case CK_ACCEPT:
 			connectionServer->rioManager.CreateRIOSocket(TCPConnection, extendedOverlapped->serviceType, extendedOverlapped->relevantSocket);
-			PRINT("Create new socket for connection Result: ", resultCreateNewSocket);
 			connectionServer->rioManager.ResetAcceptCall(extendedOverlapped);
-			PRINT("Reset Accept Call Result: ", resultResetAcceptCall);
 			break;
 
 
