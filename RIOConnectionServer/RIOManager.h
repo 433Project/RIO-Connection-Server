@@ -147,8 +147,8 @@ private:
 	void CloseCQs();
 
 	//Printing functions
-	void PrintMessageFormatter(int level, string type, string subtype, string message);
-	void PrintMessageFormatter(int level, string type, string message);
+	void PrintMessageFormatter(int level, const string &type, const string &subtype, string message);
+	void PrintMessageFormatter(int level, const string &type, string message);
 	void PrintWindowsErrorMessage();
 	void PrintBox(string word);
 };

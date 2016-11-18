@@ -33,17 +33,17 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	if (InitializeCriticalSectionAndSpinCount(&consoleCriticalSection, 4000) == 0) {
 		// Error Exit - can't make console critical section
-		return 0;
+		exit(0);
 	}
-
-	string configFileLocation = "C:\\RIOConfig\\config.txt";
+	//C:\\RIOConfig\\config.txt
+	string configFileLocation = ".\\config.txt";
 
 	PRINT("\nReading configuration data from: ", configFileLocation);
 
 	std::vector<std::thread*> threadPool;
 	std::vector<ServiceData> services;
 	RIOMainConfig rioMainConfig;
-	ConfigurationManager* configManager = new ConfigurationManager();
+	ConfigurationManager configManager;
 	BasicConnectionServerHandles connectionServer;
 
 
@@ -51,17 +51,13 @@ int _tmain(int argc, _TCHAR* argv[])
 
 
 	//Load configuration from file
-	if (configManager->LoadConfiguration(configFileLocation, &rioMainConfig, &services) != 0) {
+	if (configManager.LoadConfiguration(configFileLocation, &rioMainConfig, &services) != 0) {
 		// Error exit - could not load configuration file
-		return 0;
+		exit(0);
 	}
 	if (services.empty()) {
 		// Error Exit - no services specified
-		return 0;
-	}
-	if (configManager != nullptr) {
-		delete configManager;
-		configManager = nullptr;
+		exit(0);
 	}
 
 
@@ -85,17 +81,17 @@ int _tmain(int argc, _TCHAR* argv[])
 		rioMainConfig.spinCount,
 		rioMainConfig.dequeueCount) != 0) {
 		// Error exit - can't initialize RIO
-		return 0;
+		exit(0);
 	}
 	connectionServer.iocp = connectionServer.rioManager.CreateIOCP();
 	if (connectionServer.iocp == INVALID_HANDLE_VALUE) {
 		// Error exit - couldn't make IOCP
-		return 0;
+		exit(0);
 	}
 	CQ_Handler cqHandler = connectionServer.rioManager.CreateCQ(maximumCQSize);
 	if (cqHandler.rio_CQ == RIO_INVALID_CQ) {
 		// Error exit - couldn't make CQ
-		return 0;
+		exit(0);
 	}
 	connectionServer.cqHandler = cqHandler;
 	
@@ -113,7 +109,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			serviceData.serviceRQMaxSends,
 			serviceData.isAddressRequired) != 0) {
 			// Error exit - error creating service
-			return 0;
+			exit(0);
 		}
 	}
 
@@ -211,6 +207,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 	std::vector<ExtendedRioBuf*> results;		//Vector of Extended_RIO_BUF structs to give process manager
 	std::vector<Instruction>* instructionSet;
 	ExtendedOverlapped* extendedOverlapped = 0;
+	//std::vector<Instruction>* instructionSet;
 	DWORD bytes = 0;
 	ULONG_PTR key = 0;
 	BOOL quitTrigger = false;
@@ -218,6 +215,8 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 	int sendCount = 0;
 	int receiveCount = 0;
 	int freeBufferCount = 0;
+	int resultCreateNewSocket = 0;
+	int resultResetAcceptCall = 0;
 
 	while (true)
 	{
@@ -271,7 +270,7 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 					sendCount++;
 				}
 
-				instructionSet = processManager.GetInstructions(result);
+				std::vector<Instruction>* instructionSet = processManager.GetInstructions(result);
 
 				for each (auto instruction in *instructionSet)
 				{
@@ -287,7 +286,9 @@ void MainProcess(BasicConnectionServerHandles* connectionServer, int threadID)
 
 		case CK_ACCEPT:
 			connectionServer->rioManager.CreateRIOSocket(TCPConnection, extendedOverlapped->serviceType, extendedOverlapped->relevantSocket);
+			PRINT("Create new socket for connection Result: ", resultCreateNewSocket);
 			connectionServer->rioManager.ResetAcceptCall(extendedOverlapped);
+			PRINT("Reset Accept Call Result: ", resultResetAcceptCall);
 			break;
 
 
