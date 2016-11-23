@@ -105,12 +105,12 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	//Create each service
 	for each (auto serviceData in services)
-	{	
+	{
 		if (connectionServer.rioManager.CreateRIOSocket(
-			serviceData.serviceType, 
+			serviceData.serviceType,
 			serviceData.serviceCode, 
 			serviceData.servicePort,
-			serviceData.serviceMaxClients,		//
+			serviceData.serviceMaxClients,
 			serviceData.serviceMaxAccepts,
 			serviceData.serviceRQMaxReceives,
 			serviceData.serviceRQMaxSends,

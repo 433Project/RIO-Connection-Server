@@ -1,10 +1,11 @@
 #pragma once
 #include "definitions.h"
 #include <queue>
+#include <atomic>
 
 class BufferManager
 {
-	CRITICAL_SECTION bufferCriticalSection;
+	//CRITICAL_SECTION bufferCriticalSection;
 
 public:
 	BufferManager();
@@ -26,5 +27,6 @@ private:
 	std::vector<std::pair<RIO_BUFFERID, char*>> rioBuffers;		//rio buffer pointers. used vector to make it scalable.
 	int maxBufferCount;
 	int bufferSize;
+	std::atomic<bool> isQueueInUse;
 };
 

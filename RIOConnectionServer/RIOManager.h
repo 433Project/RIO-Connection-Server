@@ -6,9 +6,9 @@
 #include "definitions.h"
 #include "BufferManager.h"
 #include "Ws2tcpip.h"
-#include "cvmarkersobj.h"
+//#include "cvmarkersobj.h"
 
-using namespace Concurrency::diagnostic;
+//using namespace Concurrency::diagnostic;
 
 //#define PRINT_MESSAGES
 
@@ -18,10 +18,11 @@ using namespace Concurrency::diagnostic;
 #define PRINT_WIN_ERROR(h, i, j)	PrintMessageFormatter(h, i, j);		\
 									PrintWindowsErrorMessage()
 #else
-#define PRINT_FOUR(a, b, c, d)
-#define PRINT_THREE(e, f, g)
-#define PRINT_WIN_ERROR(h, i, j)
-#endif // _DEBUG
+#define PRINT_FOUR(a, b, c, d)		
+#define PRINT_THREE(e, f, g)		
+#define PRINT_WIN_ERROR(h, i, j)	
+									
+#endif // _DEBUG					
 
 typedef deque<ExtendedOverlapped> AcceptStructs;
 
@@ -108,6 +109,7 @@ typedef deque<CQ_Handler> CQList;
 
 class RIOManager
 {
+
 	RIO_EXTENSION_FUNCTION_TABLE rioFunctions; 
 	BufferManager bufferManager;
 	ExtendedOverlapped mainExtendedOverlapped;
@@ -129,7 +131,7 @@ class RIOManager
 	int rioSpinCount			= 4000;	//Default spincount of 4000
 	int dequeueCount			= 2000;	//Default dequeue count of 2000
 
-	marker_series mySeries;
+	//marker_series mySeries;
 	
 
 

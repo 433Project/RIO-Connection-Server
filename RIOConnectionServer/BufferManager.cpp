@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "BufferManager.h"
 
-BufferManager::BufferManager()
+BufferManager::BufferManager(): isQueueInUse(false)
 {
 }
 
@@ -26,7 +26,7 @@ BufferManager::~BufferManager()
 
 void BufferManager::Initialize(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable, DWORD bufferCount, DWORD bufferSize)
 {
-	InitializeCriticalSectionAndSpinCount(&bufferCriticalSection, 4000);
+	//InitializeCriticalSection(&bufferCriticalSection);
 	DWORD totalBufferSize = 0;
 	DWORD totalBufferCount = 0;
 	char* newMemoryArea = AllocateBufferSpace(bufferCount, bufferSize, totalBufferSize, totalBufferCount);
@@ -55,41 +55,51 @@ void BufferManager::Initialize(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable, D
 
 ExtendedRioBuf* BufferManager::GetBuffer()
 {
-	EnterCriticalSection(&bufferCriticalSection);
-	if (freeBufferIndex.size() <= 0)
+	while (true)
 	{
-// 		char* newMemoryArea = AllocateBufferSpace();
-// 		rioBuffers.emplace_back(newMemoryArea);
-// 		RIO_BUFFERID id = rioFuntionsTable.RIORegisterBuffer(newMemoryArea, bufferSize * bufferSize);
-// 		for (int i = 0; i < bufferCount; i++)
-// 		{
-// 			EXTENDED_RIO_BUF* buffer = new EXTENDED_RIO_BUF();
-// 			buffer->BufferId = id;
-// 			bufferPool.push_back(buffer);
-// 		}
-		LeaveCriticalSection(&bufferCriticalSection);
-		return nullptr;
-	}
-	int index = freeBufferIndex.front();
-	freeBufferIndex.pop();
-	LeaveCriticalSection(&bufferCriticalSection);
+		bool testVal = false;
+		bool newVal = true;
+		if (isQueueInUse.compare_exchange_strong(testVal, newVal))
+		{
+			if (freeBufferIndex.size() <= 0)
+			{
+				isQueueInUse = false;
+				return nullptr;
+			}
+			int index = freeBufferIndex.front();
+			freeBufferIndex.pop();
 
-	return bufferPool[index];
+			isQueueInUse = false;
+			return bufferPool[index];
+		}
+	}
+	
 }
 
 void BufferManager::FreeBuffer(ExtendedRioBuf* buffer)
 {
+
 	if (buffer == nullptr)
 	{
 		cout << "buffer is nullptr" << endl;
 	}
 	buffer->messageLength = 0;
 	buffer->socketContext = 0;
-
 	int bufferIndex = buffer->Offset / bufferSize;
-	EnterCriticalSection(&bufferCriticalSection);
-	freeBufferIndex.push(bufferIndex);
-	LeaveCriticalSection(&bufferCriticalSection);
+	//EnterCriticalSection(&bufferCriticalSection);
+	//LeaveCriticalSection(&bufferCriticalSection);
+
+	while (true)
+	{
+		bool testVal = false;
+		bool newVal = true;
+		if (isQueueInUse.compare_exchange_strong(testVal, newVal))
+		{
+			freeBufferIndex.push(bufferIndex);
+			isQueueInUse = false;
+		}
+	}
+
 }
 
 void BufferManager::ShutdownCleanup(RIO_EXTENSION_FUNCTION_TABLE& rioFuntionsTable)
