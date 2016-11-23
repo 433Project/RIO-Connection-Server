@@ -95,8 +95,10 @@ void BufferManager::FreeBuffer(ExtendedRioBuf* buffer)
 		bool newVal = true;
 		if (isQueueInUse.compare_exchange_strong(testVal, newVal))
 		{
+			std::cout << "in" << std::endl;
 			freeBufferIndex.push(bufferIndex);
 			isQueueInUse = false;
+			return;
 		}
 	}
 
