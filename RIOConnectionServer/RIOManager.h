@@ -6,9 +6,9 @@
 #include "definitions.h"
 #include "BufferManager.h"
 #include "Ws2tcpip.h"
-//#include "cvmarkersobj.h"
+#include "cvmarkersobj.h"
 
-//using namespace Concurrency::diagnostic;
+using namespace Concurrency::diagnostic;
 
 //#define PRINT_MESSAGES
 
@@ -131,7 +131,7 @@ class RIOManager
 	int rioSpinCount			= 4000;	//Default spincount of 4000
 	int dequeueCount			= 2000;	//Default dequeue count of 2000
 
-	//marker_series mySeries;
+	marker_series mySeries;
 	
 
 

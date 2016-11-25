@@ -6,7 +6,7 @@ RIOManager::RIOManager()
 {
 	InitializeSRWLock(&serviceListSRWLock);
 	socketRIO = INVALID_SOCKET;
-	//spans(mySeries, _T("Thread Blocking Finder"));
+	span s(mySeries, _T("Thread Blocking Finder"));
 }
 
 ///This function loads WinSock and initiates the RIOManager basic needs such as registered buffers.
@@ -1357,30 +1357,30 @@ bool RIOManager::PostReceiveOnTCPService(int serviceType, int destinationCode, D
 	ReleaseSRWLockExclusive(&serviceListSRWLock);
 
 	
-	//mySeries.write_flag(_T("Point 1"));
+	mySeries.write_flag(_T("Point 1"));
 	EnterCriticalSection(&connServ.socketListCriticalSection);
-	//mySeries.write_flag(_T("Point 2"));
+	mySeries.write_flag(_T("Point 2"));
 	SocketList::iterator iterSL = connServ.socketList->find(destinationCode);
-	//mySeries.write_flag(_T("Point 3"));
+	mySeries.write_flag(_T("Point 3"));
 	if (iterSL == connServ.socketList->end()) 
 	{
-		//mySeries.write_flag(_T("Point 4"));
+		mySeries.write_flag(_T("Point 4"));
 		//Service entry no longer exists and has been cleared
 		PRINT_THREE(1, "ERROR", "Post Receive Fail. Entry no longer exists on TCP Service #" + to_string(serviceType));
 		PRINT_THREE(2, "DST CODE", to_string(destinationCode));
-		//mySeries.write_flag(_T("Point 5"));
+		mySeries.write_flag(_T("Point 5"));
 		LeaveCriticalSection(&connServ.socketListCriticalSection);
-		//mySeries.write_flag(_T("Point 6"));
+		mySeries.write_flag(_T("Point 6"));
 		bufferManager.FreeBuffer(rioBuf);
-		//mySeries.write_flag(_T("Point 7"));
+		mySeries.write_flag(_T("Point 7"));
 		return false;
 	}
-	//mySeries.write_flag(_T("Point 8"));
+	mySeries.write_flag(_T("Point 8"));
 	RQ_Handler rqHandler = iterSL->second;
-	//mySeries.write_flag(_T("Point 9"));
+	mySeries.write_flag(_T("Point 9"));
 	LeaveCriticalSection(&connServ.socketListCriticalSection);
 	Sleep(0);
-	//mySeries.write_flag(_T("Point 10"));
+	mySeries.write_flag(_T("Point 10"));
 
 
 	
